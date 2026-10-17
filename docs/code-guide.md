@@ -52,6 +52,7 @@ src/
 │
 ├─ components.ts             # 玩家组件：整图保存 / 框选封装 / 实例展开
 ├─ componentManagement.ts    # 组件库管理：重命名、软删除、依赖闭包、替换实例
+├─ libraryGrouping.ts        # 组件库展示分组：相似元件按家族合并、位宽变体切换
 ├─ WorkshopView.tsx          # 元件工坊：独立于关卡的自定义组件搭建台（levelId=0 草稿）
 │
 ├─ App.tsx                   # 工作区主界面：游戏状态、编辑器、测试面板、各类弹窗
@@ -200,7 +201,8 @@ Worker 承担全部重活，主线程只做 UI：
 - `expandComponent`：反向内联展开，临时接口节点按「每个进入 × 每个离开」笛卡尔拼接后删除，因此「组件输出直接反馈回自己输入」的连线也能正确落回真实驱动者。
 - 同名保存（`define`）自动 `version+1`；旧版本永远留在库里保护历史引用。
 - 管理侧：`dependentComponentKeys` 求传递依赖闭包（删除时一并软删除）；`markComponentsDeleted` 软删除后，电路中的残留实例标红、只能移除或替换（`replaceComponentInstance`，要求接口端口完全一致）；`pruneDeletedComponents` 在序列化时清掉不再被任何活组件/关卡电路/证明引用的已删除版本；`renameComponent` 同步更新库内所有引用处的实例标签。
-- **元件工坊（WorkshopView.tsx）**：独立于关卡的全屏搭建台。电路是 `levelId=0` 的工坊草稿（`createWorkshopCircuit`/`validateWorkshopCircuit` 不绑定关卡端口），INPUT/OUTPUT 自由添加且即未来组件接口；`model/components` 的增删连线封装操作都带 `workshop` 尾参切换到该校验。交互仿真复用 `useSimulation`（`simulator.checkedSession` 同样按 levelId 分派校验器），草稿持久化在 `Workspace.workshop`（开关值不持久化）；侧栏组件库可"新建元件"或对玩家组件"在工坊中编辑"（载入 `def.graph`，同名保存经 `define` 自动 vN+1）。组件库列表按名称家族分组，最新版本置顶标记。
+- **元件工坊（WorkshopView.tsx）**：独立于关卡的全屏搭建台。电路是 `levelId=0` 的工坊草稿（`createWorkshopCircuit`/`validateWorkshopCircuit` 不绑定关卡端口），INPUT/OUTPUT 自由添加且即未来组件接口；`model/components` 的增删连线封装操作都带 `workshop` 尾参切换到该校验。交互仿真复用 `useSimulation`（`simulator.checkedSession` 同样按 levelId 分派校验器），草稿持久化在 `Workspace.workshop`（开关值不持久化）；侧栏组件库可"新建元件"或对玩家组件"在工坊中编辑"（载入 `def.graph`，同名保存经 `define` 自动 vN+1）。
+- **组件库家族分组（libraryGrouping.ts）**：`groupComponentFamilies` 按「去掉位宽前缀的基础名（`stripWidthMarker`，识别 八位/4位/8-bit 等写法）+ 输入/输出端口数」把相似元件合为一家（端口数而非端口 id 作签名——工坊封装的组件端口 id 是随机节点 id）；家族内按端口推导位宽（`componentWidth`，全部端口位宽最大值）分桶，多个位宽变体时 UI 用小选择框切换（`activeVariant` 未选时默认最宽），桶内版本号降序、最新置顶。组件库标签页、教学组件面板与工坊调色板三处共用。
 
 ## 10. 存档（storage.ts）
 
@@ -238,7 +240,7 @@ Worker 承担全部重活，主线程只做 UI：
 ## 13. 测试体系
 
 ```bash
-npm test          # Vitest 单元测试（约 292 项）
+npm test          # Vitest 单元测试（约 297 项）
 npm run build     # tsc -b && vite build（类型检查 + 生产构建）
 npm run test:e2e  # Playwright 浏览器验收（约 36 项，需要 Chromium）
 ```

@@ -114,6 +114,7 @@ CPU与组件依赖固定，允许移动布局、观察内部电路和编写程�
 | content/levels/ | 声明式关卡（第 1–20 关 JSON 数据，期望值为独立数学表达式） |
 | src/levelSpec.ts、src/levelExpr.ts、src/levelRegistry.ts | 关卡编写 API：校验、编译与表达式求值 |
 | src/WorkshopView.tsx | 元件工坊：独立于关卡自由搭建/修改自定义组件 |
+| src/libraryGrouping.ts | 组件库展示分组：相似元件按家族合并、位宽变体小选择框切换 |
 | src/levels.ts | 关卡目录与四阶段聚合 |
 | src/sequentialLevels.ts | 第 21–32 关与独立时序参考场景 |
 | src/architectureLevels.ts、src/architectureSpec.ts | 第33–44关、指令规格、独立状态机和程序测试 |

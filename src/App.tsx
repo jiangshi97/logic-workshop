@@ -22,6 +22,7 @@ import { TimingWaveform } from './TimingWaveform';
 import { ArchitecturePanel, ProgramEditor } from './ArchitecturePanel';
 import { instructionSet } from './architectureSpec';
 import { architectureLibrary } from './architectureCircuits';
+import { activeVariant, groupComponentFamilies } from './libraryGrouping';
 import { ProgrammingPanel } from './ProgrammingPanel';
 import { programmingCases } from './programmingSpec';
 import { WorkshopView } from './WorkshopView';
@@ -514,19 +515,13 @@ function Workshop() {
   const hasEditableSelection = !programming && circuit.nodes.some(n => selection.nodes.includes(n.id) && n.type !== 'INPUT' && n.type !== 'OUTPUT');
   const selectionUsesDeleted = circuit.nodes.some(n => selection.nodes.includes(n.id) && n.type === 'COMPONENT' && workspace.library[n.componentKey ?? '']?.deleted);
   const visibleLibraryEntries = Object.entries(workspace.library).filter(([key, definition]) => !definition.deleted && (!teachingLibrary[key] || (definition.sourceLevel ?? 0) < current));
-  // 组件库按名称家族分组：同名各版本聚合展示（最新在前），解决不同位宽/历史版本分散难找的问题。
-  const libraryFamilies = useMemo(() => {
-    const families = new Map<string, { key: string; definition: ComponentDefinition }[]>();
-    for (const entry of visibleLibraryEntries) {
-      const versions = families.get(entry[1].name) ?? [];
-      versions.push({ key: entry[0], definition: entry[1] });
-      families.set(entry[1].name, versions);
-    }
-    return [...families.entries()].map(([name, versions]) => ({
-      name,
-      versions: [...versions].sort((left, right) => right.definition.version - left.definition.version),
-    })).sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
-  }, [visibleLibraryEntries]);
+  // 组件库按家族分组：基础名（去位宽前缀）+ 接口形状相同的元件合为一家；
+  // 家族有多个位宽变体时用小选择框切换，展示对应位宽下的各版本（最新在前）。
+  const libraryFamilies = useMemo(() => groupComponentFamilies(visibleLibraryEntries.map(([key, definition]) => ({ key, definition }))), [visibleLibraryEntries]);
+  const teachingFamilies = useMemo(() => groupComponentFamilies(Object.entries(teachingLibrary)
+    .filter(([, definition]) => (definition.sourceLevel ?? 0) < current)
+    .map(([key, definition]) => ({ key, definition }))), [teachingLibrary, current]);
+  const [widthChoices, setWidthChoices] = useState<Record<string, number>>({});
   // 打开元件工坊：不传定义即继续/新建草稿；传入定义则载入其内部图供修改（同名保存出新版本）。
   const openWorkshop = (definition?: ComponentDefinition) => {
     if (busy === '验证通关记录') return;
@@ -593,23 +588,34 @@ function Workshop() {
         </Fragment>)}
       </nav> : <section ref={restoreLibraryScroll} className="saved-components" aria-label="组件库" onScroll={event => { sidebarScrollPositions.current.library = event.currentTarget.scrollTop; }}>
         <button className="workshop-open-button" aria-label="打开元件工坊" disabled={busy === '验证通关记录'} onClick={() => openWorkshop()}><Wrench size={15} /><span>元件工坊</span><span className="workshop-open-hint">自由搭建元件</span></button>
-        {libraryFamilies.map(family => <div className="library-family" key={family.name}>
-          {family.versions.map(({ key, definition }, index) => <div className="library-item" key={key} style={index ? { paddingLeft: 16 } : undefined}>
+        {libraryFamilies.map(family => { const variant = activeVariant(family, widthChoices[family.id]);
+          return <div className="library-family" key={family.id}>
+          {variant.versions.map(({ key, definition }, index) => <div className="library-item" key={key} style={index ? { paddingLeft: 16 } : undefined}>
           <button className="component" aria-label={`添加组件 ${definition.name} v${definition.version}`} disabled={programming} draggable={!programming} onDragStart={e => e.dataTransfer.setData('application/logic-component', key)} onClick={() => placeComponent(key)}>
-            <Package size={23} /><span><strong>{definition.name}</strong><small>v{definition.version}{index === 0 && family.versions.length > 1 ? ' · 最新' : ''} · {definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>
-          <div className="library-actions"><ToolButton label="查看内部电路" onClick={() => setInspect(definition)}><Eye size={14} /></ToolButton>
+            <Package size={23} /><span><strong>{definition.name}</strong><small>v{definition.version}{index === 0 && variant.versions.length > 1 ? ' · 最新' : ''} · {definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>
+          <div className="library-actions">
+            {family.widths.length > 1 && index === 0 && <select className="width-picker" aria-label={`${family.baseName} 位宽`} value={variant.width} onChange={event => setWidthChoices(choices => ({ ...choices, [family.id]: Number(event.target.value) }))}>
+              {family.widths.map(option => <option key={option.width} value={option.width}>{option.width} 位</option>)}
+            </select>}
+            <ToolButton label="查看内部电路" onClick={() => setInspect(definition)}><Eye size={14} /></ToolButton>
             {!teachingLibrary[key] && <><ToolButton label={`在工坊中编辑 ${definition.name} v${definition.version}`} onClick={() => openWorkshop(definition)}><Wrench size={13} /></ToolButton><ToolButton label={`重命名 ${definition.name} v${definition.version}`} onClick={() => openRename(key)}><Pencil size={13} /></ToolButton><ToolButton label={`删除 ${definition.name} v${definition.version}`} onClick={() => openDelete(key)}><Trash2 size={13} /></ToolButton></>}
           </div>
         </div>)}
-        </div>)}
+        </div>; })}
         {!visibleLibraryEntries.length && <p className="library-empty">组件库为空</p>}
       </section>}
       {architecture && <div className="palette-tabs" role="tablist" aria-label="组件区域"><button role="tab" aria-selected={paletteTab === 'available'} className={paletteTab === 'available' ? 'chosen' : ''} onClick={() => setPaletteTab('available')}><Cable size={14} />基础组件</button><button role="tab" aria-selected={paletteTab === 'teaching'} className={paletteTab === 'teaching' ? 'chosen' : ''} onClick={() => setPaletteTab('teaching')}><Package size={14} />教学组件</button></div>}
-      {architecture && paletteTab === 'teaching' && <section className="teaching-components palette-panel" aria-label="教学组件"><p>已学模块，可查看内部电路或使用自己的作品。</p>
-        {Object.entries(teachingLibrary).filter(([, definition]) => (definition.sourceLevel ?? 0) < current).map(([key, definition]) => <div className="library-item" key={key}>
+      {architecture && paletteTab === 'teaching' && <section className="teaching-components palette-panel" aria-label="教学组件"><p>已学模块，可查看内部电路或使用自己的作品。同族元件用位宽选择框切换。</p>
+        {teachingFamilies.flatMap(family => { const variant = activeVariant(family, widthChoices[family.id]);
+          return variant.versions.map(({ key, definition }, index) => <div className="library-item" key={key}>
           <button className="component" aria-label={`添加教学组件 ${definition.name}`} draggable onDragStart={e => e.dataTransfer.setData('application/logic-component', key)} onClick={() => placeComponent(key)}><Package size={23} /><span><strong>{definition.name}</strong><small>{definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>
-          <div className="library-actions"><ToolButton label={`查看教学组件 ${definition.name}`} onClick={() => setInspect(definition)}><Eye size={14} /></ToolButton></div>
-        </div>)}
+          <div className="library-actions">
+            {family.widths.length > 1 && index === 0 && <select className="width-picker" aria-label={`${family.baseName} 位宽`} value={variant.width} onChange={event => setWidthChoices(choices => ({ ...choices, [family.id]: Number(event.target.value) }))}>
+              {family.widths.map(option => <option key={option.width} value={option.width}>{option.width} 位</option>)}
+            </select>}
+            <ToolButton label={`查看教学组件 ${definition.name}`} onClick={() => setInspect(definition)}><Eye size={14} /></ToolButton>
+          </div>
+        </div>); })}
       </section>}
       {!programming && (!architecture || paletteTab === 'available') && <div className="components-section palette-panel">{!architecture && <div className="sidebar-section-title"><Cable size={14} /><span>可用组件</span><span className="component-count">{level.allowed.length}</span></div>}
         {level.allowed.includes('SPLIT') && <label className="bus-size">元件位宽<select aria-label="总线位宽" value={busBits} onChange={e => setBusBits(Number(e.target.value))}>{level.allowed.includes('CONST') && <option value="1">1 bit</option>}<option value="2">2 bit</option><option value="4">4 bit</option>{(temporal || architecture) && <option value="8">8 bit</option>}{architecture && <option value="16">16 bit</option>}</select></label>}

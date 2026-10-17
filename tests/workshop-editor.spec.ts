@@ -67,3 +67,52 @@ test('workshop builds a component end to end, versions it and persists the draft
   await expect(page.getByRole('button', { name: '添加组件 反相器 v1', exact: true })).toBeVisible();
   await expect(page.locator('.library-family').first()).toContainText('最新');
 });
+
+test('merges bit-width variants of one component family behind a width selector', async ({ page }) => {
+  const buildInverter = async () => {
+    await page.getByRole('button', { name: '添加 输入接口', exact: true }).click();
+    await page.getByRole('button', { name: '添加 NOT', exact: true }).click();
+    await page.getByRole('button', { name: '添加 输出接口', exact: true }).click();
+    // 端口按节点顺序出现：INPUT.out、NOT.a、NOT.out、OUTPUT.in——依次点击完成两条连线。
+    const ports = await page.locator('.workshop-board .react-flow__handle')
+      .evaluateAll(handles => handles.map(handle => handle.getAttribute('data-testid')!));
+    expect(ports).toHaveLength(4);
+    for (const port of ports) await page.getByTestId(port).click();
+    await expect(page.locator('.workshop-board .react-flow__edge')).toHaveCount(2);
+  };
+  const saveAs = async (name: string) => {
+    await page.getByRole('button', { name: '保存为组件', exact: true }).click();
+    await page.getByLabel('组件名称', { exact: true }).fill(name);
+    await page.getByRole('button', { name: '保存组件', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('组件已保存');
+    await page.getByRole('button', { name: '返回关卡', exact: true }).click();
+  };
+
+  await page.getByRole('button', { name: /^组件库/ }).click();
+  await page.getByRole('button', { name: '打开元件工坊' }).click();
+  await page.getByLabel('总线位宽').selectOption('1');
+  await buildInverter();
+  await saveAs('反相器');
+
+  await page.getByRole('button', { name: '打开元件工坊' }).click();
+  await page.getByRole('button', { name: '清空工坊', exact: true }).click();
+  await expect(page.locator('.workshop-board .react-flow__node')).toHaveCount(0);
+  await page.getByLabel('总线位宽').selectOption('8');
+  await buildInverter();
+  await saveAs('八位反相器');
+
+  // 关卡侧组件库：同族元件合并，默认展示最宽变体，小选择框切换位宽。
+  const library = page.locator('.saved-components');
+  await expect(library.getByRole('combobox', { name: '反相器 位宽' })).toHaveCount(1);
+  await expect(library.getByRole('button', { name: '添加组件 八位反相器 v1', exact: true })).toBeVisible();
+  await expect(library.getByRole('button', { name: '添加组件 反相器 v1', exact: true })).toHaveCount(0);
+  await library.getByRole('combobox', { name: '反相器 位宽' }).selectOption('1');
+  await expect(library.getByRole('button', { name: '添加组件 反相器 v1', exact: true })).toBeVisible();
+  await expect(library.getByRole('button', { name: '添加组件 八位反相器 v1', exact: true })).toHaveCount(0);
+
+  // 工坊调色板同样按家族合并，位宽选择框常驻。
+  await page.getByRole('button', { name: '打开元件工坊' }).click();
+  const palette = page.locator('.workshop-palette');
+  await expect(palette.getByRole('combobox', { name: '反相器 位宽' })).toHaveCount(1);
+  await expect(palette.getByRole('button', { name: '添加组件 八位反相器', exact: true })).toBeVisible();
+});

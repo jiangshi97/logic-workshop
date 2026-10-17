@@ -12,6 +12,7 @@ import { addGate, addComponent, getPorts, connect, canConnect, createWorkshopCir
   validateWorkshopCircuit, type Circuit } from './model';
 import type { ComponentDefinition, ComponentLibrary, GateType, Inputs } from './contracts';
 import { encapsulateSelection, expandComponent, packageCircuit } from './components';
+import { activeVariant, groupComponentFamilies, type ComponentFamily } from './libraryGrouping';
 import { useSimulation } from './workerClient';
 import { createId } from './id';
 import { CircuitNodeView, GateSymbol, nodeDimensions, type FlowNode } from './CircuitNode';
@@ -62,6 +63,7 @@ function WorkshopCanvas(props: WorkshopViewProps) {
   const [packageMode, setPackageMode] = useState<'selection' | 'whole' | null>(null);
   const [componentName, setComponentName] = useState('');
   const [programId, setProgramId] = useState<string | null>(null);
+  const [widthChoices, setWidthChoices] = useState<Record<string, number>>({});
   const dragBefore = useRef<Circuit | null>(null);
   const flow = useReactFlow<FlowNode, FlowEdge>();
   const mergedLibrary = useMemo(() => ({ ...teachingLibrary, ...library }), [teachingLibrary, library]);
@@ -267,6 +269,17 @@ function WorkshopCanvas(props: WorkshopViewProps) {
   const selectedNode = circuit.nodes.find(n => selection.nodes.length === 1 && n.id === selection.nodes[0]);
   const teachingEntries = Object.entries(teachingLibrary).filter(([, definition]) => (definition.sourceLevel ?? 0) < unlocked);
   const playerEntries = Object.entries(library).filter(([, definition]) => !definition.deleted && !teachingLibrary[key0(definition)]);
+  // 我的组件 / 教学组件按家族分组：多位宽家族顶部给一个小选择框切换位宽，下方列出该位宽的版本。
+  const playerFamilies = groupComponentFamilies(playerEntries.map(([key, definition]) => ({ key, definition })));
+  const teachingFamilies = groupComponentFamilies(teachingEntries.map(([key, definition]) => ({ key, definition })));
+  const widthPicker = (family: ComponentFamily) =>
+    <div className="width-picker-row" key={`${family.id}-picker`}>
+      <small>{family.baseName}</small>
+      <select className="width-picker" aria-label={`${family.baseName} 位宽`} value={activeVariant(family, widthChoices[family.id]).width}
+        onChange={event => setWidthChoices(choices => ({ ...choices, [family.id]: Number(event.target.value) }))}>
+        {family.widths.map(option => <option key={option.width} value={option.width}>{option.width} 位</option>)}
+      </select>
+    </div>;
 
   return <div className="workshop-overlay" role="dialog" aria-modal="true" aria-label="元件工坊">
     <header className="workshop-header">
@@ -311,13 +324,19 @@ function WorkshopCanvas(props: WorkshopViewProps) {
           draggable onDragStart={e => { e.dataTransfer.setData('application/logic-gate', type); e.dataTransfer.effectAllowed = 'copy'; }} onClick={() => add(type)}>
           <GateSymbol type={type} small /><span><strong>{type}</strong><small>{GATE_LABELS[type]} · {type === 'ROM' ? 16 : type === 'RAM' ? 8 : busBits} bit</small></span><Plus size={15} /></button>)}
         {!!playerEntries.length && <div className="sidebar-section-title"><Package size={14} /><span>我的组件</span><span className="component-count">{playerEntries.length}</span></div>}
-        {playerEntries.map(([key, definition]) => <button className="component" key={key} aria-label={`添加组件 ${definition.name}`}
-          draggable onDragStart={e => e.dataTransfer.setData('application/logic-component', key)} onClick={() => placeComponent(key)}>
-          <Package size={23} /><span><strong>{definition.name}</strong><small>v{definition.version} · {definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>)}
+        {playerFamilies.flatMap(family => { const variant = activeVariant(family, widthChoices[family.id]);
+          return [...(family.widths.length > 1 ? [widthPicker(family)] : []),
+            ...variant.versions.map(({ key, definition }) => <button className="component" key={key} aria-label={`添加组件 ${definition.name}`}
+              draggable onDragStart={e => e.dataTransfer.setData('application/logic-component', key)} onClick={() => placeComponent(key)}>
+              <Package size={23} /><span><strong>{definition.name}</strong><small>v{definition.version} · {definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>)];
+        })}
         {!!teachingEntries.length && <div className="sidebar-section-title"><Package size={14} /><span>教学组件</span><span className="component-count">{teachingEntries.length}</span></div>}
-        {teachingEntries.map(([key, definition]) => <button className="component" key={key} aria-label={`添加教学组件 ${definition.name}`}
-          draggable onDragStart={e => e.dataTransfer.setData('application/logic-component', key)} onClick={() => placeComponent(key)}>
-          <Package size={23} /><span><strong>{definition.name}</strong><small>{definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>)}
+        {teachingFamilies.flatMap(family => { const variant = activeVariant(family, widthChoices[family.id]);
+          return [...(family.widths.length > 1 ? [widthPicker(family)] : []),
+            ...variant.versions.map(({ key, definition }) => <button className="component" key={key} aria-label={`添加教学组件 ${definition.name}`}
+              draggable onDragStart={e => e.dataTransfer.setData('application/logic-component', key)} onClick={() => placeComponent(key)}>
+              <Package size={23} /><span><strong>{definition.name}</strong><small>{definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>)];
+        })}
       </aside>
 
       <div className="workshop-board">
