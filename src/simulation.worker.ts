@@ -1,3 +1,5 @@
+// 仿真 Worker：承担交互仿真（常驻会话）、判题、证明重验与存档解析四类后台任务。
+// 交互会话按「电路去位置后的 JSON + 组件库」作为 sessionKey 缓存运行状态：移动节点不清零试验，改结构即重置。
 import { createSimulationSession, judge, replaySequence, simulate } from './simulator';
 import { levels, testSequences } from './levels';
 import { parseWorkspace } from './storage';
@@ -6,6 +8,7 @@ import { createProgrammingRunner } from './programmingRunner';
 import { programmingCases } from './programmingSpec';
 import type { Circuit, ComponentLibrary, Inputs, RuntimeState, Simulation, SimulationFrame } from './contracts';
 
+/** 主线程 → Worker 的请求协议；operation 决定其余字段如何解释。 */
 interface Request {
   id: number;
   operation: 'simulate' | 'judge' | 'verify' | 'load' | 'tick' | 'reset' | 'replay' | 'programStep' | 'programRun' | 'programCase';
@@ -36,6 +39,7 @@ function sameSignals(a: Record<string, unknown>, b: Record<string, unknown>): bo
   return keys.length === Object.keys(b).length && keys.every(key => a[key] === b[key]);
 }
 
+/** 记录一帧观察并维护最近 64 帧 trace；无沿且输入输出都没变时跳过，避免波形重复。 */
 function recordFrame(simulation: Simulation, circuit: Circuit, inputs: Inputs, tick: boolean): Simulation {
   runtime = simulation.state;
   const frame: SimulationFrame = {
@@ -66,6 +70,7 @@ function runSession(request: Request): Simulation {
   }
   const key = JSON.stringify({ caller:request.sessionKey,level: circuit.levelId,
     nodes: circuit.nodes.map(({ position: _position, ...node }) => node), wires: circuit.wires, library });
+  // 结构变化（不含节点位置）即视为新会话，试验状态从零开始。
   if (key !== sessionKey || request.operation === 'reset') {
     sessionKey = key;
     runtime = undefined;
@@ -124,6 +129,7 @@ globalThis.addEventListener('message', (event: MessageEvent<Request>) => {
     } else if (request.operation === 'judge') {
       result = judge(request.circuit!, request.library ?? {});
     } else if (request.operation === 'verify') {
+      // 证明重验：按关卡顺序逐个重跑 judge，遇到第一个无法通过的证明即停止。
       const valid: Record<number, Circuit> = {};
       for (const level of levels) {
         const proof = request.proofs?.[level.id];

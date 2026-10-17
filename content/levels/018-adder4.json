@@ -1,0 +1,13 @@
+{
+  "id": 18,
+  "title": "四位加法",
+  "caption": "构建组合运算器",
+  "goal": "计算四位 A+B+Cin，Sum 保留四位，Cout 表示溢出。",
+  "formula": "Sum + 16Cout = A + B + Cin",
+  "chapter": 4,
+  "inputs": [["A", 4], ["B", 4], ["Cin", 1]],
+  "outputs": [["Sum", 4], ["Cout", 1]],
+  "hints": ["复用全加器或者两位加法器。", "每一级进位都只流向相邻的高位。", "四个位串联进位，将四个 Sum 接 JOIN，最高位 Cout 连接输出。"],
+  "rewardName": "Adder4",
+  "combinational": { "expect": { "Sum": "(A + B + Cin) mod 16", "Cout": "(A + B + Cin) div 16" } }
+}

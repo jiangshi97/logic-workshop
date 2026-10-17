@@ -1,3 +1,4 @@
+// 时序波形：把最近 64 帧观察渲染成波形图——1bit 信号画跳变折线，总线画数值格；列头标出时钟沿与周期号。
 import type { Port, SimulationFrame } from './contracts';
 
 export function TimingWaveform({ frames, inputs, outputs }: { frames: SimulationFrame[]; inputs: Port[]; outputs: Port[] }) {

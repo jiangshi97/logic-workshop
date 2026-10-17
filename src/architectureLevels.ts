@@ -1,3 +1,5 @@
+// 第 33–44 关（计算机架构）：从八位加减器到整机 CPU。
+// 组合关（33/34/37/40）提供 expected 与公开用例集；时序关（35/36/38/39/41–44）由 architectureOracle 生成场景。
 import type { GateType, Inputs, Outputs, Port, SimulationStep, TestSequence } from './contracts';
 import type { Level } from './levels';
 import { architectureOracle, architecturePrograms, byteALU, decodeInstruction, encodeInstruction, instructionControl } from './architectureSpec';
@@ -5,15 +7,16 @@ import { architectureOracle, architecturePrograms, byteALU, decodeInstruction, e
 type Specs = [string, number][];
 const tools: GateType[] = ['NAND', 'NOT', 'AND', 'OR', 'XOR', 'XNOR', 'SPLIT', 'JOIN', 'CONST', 'DFF'];
 const ports = (specs: Specs): Port[] => specs.map(([id, bits]) => ({ id, label: id, bits }));
+/** 架构关卡工厂：给 expected 即为组合关（用公开用例集），否则为时序关（走 scenarios 场景）。 */
 function lesson(id: number, title: string, caption: string, goal: string, formula: string,
   inputSpecs: Specs, outputSpecs: Specs, hints: string[], rewardName: string,
   expected?: (i: Inputs) => Outputs, cases?: () => Inputs[]): Level {
   const inputPorts = ports(inputSpecs), outputPorts = ports(outputSpecs);
   const expectedOutputs = expected ?? (i => architectureOracle(id)(i, true));
-  return { id, title, caption, story: goal, goal, formula, chapter: 6,
+  return { id, title, caption, goal, formula, chapter: 6,
     inputs: inputPorts.map(p => p.id), inputPorts, outputPorts,
     allowed: [...tools, ...(id >= 38 ? ['ROM' as GateType] : []), ...(id >= 41 ? ['RAM' as GateType] : [])],
-    hints, rewardName, expectedOutputs, expected: i => expectedOutputs(i)[outputPorts[0].id],
+    hints, rewardName, expectedOutputs,
     ...(expected ? { cases } : { mode: 'sequential' as const, sequences: () => scenarios(id, inputPorts) }),
     ...([38, 44].includes(id) ? { defaultProgram: [...architecturePrograms[0].words] } : {}),
   };
@@ -83,6 +86,7 @@ export const architectureLevels: Level[] = [
     ['ROM 节点 ID=program。IR 在阶段0捕获，阶段2用 IR 的控制信号执行。', '普通指令完成后 PC 加1，JMP/JZ 选择目标；HLT/非法将机器停在阶段2（设置 Halt，PC 不更新）。', 'E 门控所有状态与 RAM 写入；R 沿上清状态/RAM但保留 ROM，机器观察面板显示真实电路的状态。'], 'Computer8'),
 ];
 
+/** 生成第 35–44 关测试场景；第 44 关逐个运行 architecturePrograms 中的程序并穿插暂停/复位。 */
 function scenarios(id: number, inputPorts: Port[]): TestSequence[] {
   const result: TestSequence[] = [];
   const defaults = Object.fromEntries(inputPorts.map(p => [p.id, 0]));

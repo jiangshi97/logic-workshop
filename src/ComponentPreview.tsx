@@ -1,3 +1,5 @@
+// 组件内部电路的只读预览：用 ELK 分层布局（从左到右、正交布线）重排节点，
+// 布局失败时回退到保存时的原始坐标；signals 可选注入实时仿真值。
 import { useEffect, useMemo, useState } from 'react';
 import { BaseEdge, Background, EdgeLabelRenderer, getSmoothStepPath, ReactFlow, ReactFlowProvider, type Edge, type EdgeProps } from '@xyflow/react';
 import type { ElkEdgeSection, ElkNode, ElkPoint } from 'elkjs/lib/elk-api';
@@ -100,6 +102,7 @@ function applySignals(graph: { nodes: FlowNode[]; edges: PreviewEdge[] }, defini
   return { nodes, edges };
 }
 
+/** 组装 ELK 布局图：端口固定在节点左右两侧（FIXED_POS），INPUT/OUTPUT 分别约束在首/末层。 */
 async function layoutGraph(definition: ComponentDefinition, library: ComponentLibrary) {
   const { default: ELK } = await import('elkjs/lib/elk.bundled.js');
   const elk = new ELK();

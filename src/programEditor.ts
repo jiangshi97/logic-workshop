@@ -1,3 +1,5 @@
+// ROM 十六进制编辑器的文本解析与格式化：每行一个 0000–FFFF 的十六进制指令字，从地址 0 开始。
+/** 把编辑器文本解析为指令字数组；非法 token 抛出带序号的错误。 */
 export function parseProgramText(text: string): number[] {
   const tokens = text.trim() ? text.trim().split(/[\s,]+/) : [];
   if (tokens.length > 256) throw new Error('ROM 最多保存 256 个指令字。');

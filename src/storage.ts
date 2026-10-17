@@ -1,4 +1,6 @@
-import { createCircuit, validateCircuit, validateLibrary } from './model';
+// 版本化存档：Workspace 的创建、严格解析（v1–v5 迁移与防篡改）、证明重验与确定性序列化。
+// 证明（proofs）独立于草稿电路：修改草稿不影响通关进度；导入时逐关重跑 judge 后才整体替换工作区。
+import { createCircuit, validateCircuit, validateLibrary, validateWorkshopCircuit } from './model';
 import { levels } from './levels';
 import { judge } from './simulator';
 import { assemble } from './assembler';
@@ -7,22 +9,25 @@ import { pruneDeletedComponents } from './componentManagement';
 import type { Circuit, CircuitGraph, CircuitNode, ComponentDefinition, ComponentLibrary, Inputs, NodeType, Port, Wire } from './contracts';
 
 export const STORAGE_KEY = 'logic-workshop.v1';
+/** 存档结构（version 6）：56 关草稿、通关证明、每关输入值、完整组件库与可选的元件工坊草稿（levelId=0）。 */
 export interface Workspace {
-  version: 5;
+  version: 6;
   currentLevel: number;
   circuits: Record<number, Circuit>;
   proofs: Record<number, Circuit>;
   inputs: Record<number, Inputs>;
   library: ComponentLibrary;
+  workshop?: Circuit;
 }
 
 export function createWorkspace(): Workspace {
-  return { version: 5, currentLevel: 1, proofs: {}, library: programmingMachineLibrary(),
+  return { version: 6, currentLevel: 1, proofs: {}, library: programmingMachineLibrary(),
     circuits: Object.fromEntries(levels.map(level => [level.id, level.id >= 45 ? programmingMachine(level.id) : createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, level.id >= 45 && name === 'E' ? 1 : 0]))])) };
 }
 
 const nodeTypes: NodeType[] = ['INPUT', 'OUTPUT', 'NAND', 'NOT', 'AND', 'OR', 'XOR', 'XNOR', 'CONST', 'SPLIT', 'JOIN', 'DFF', 'ROM', 'RAM', 'COMPONENT'];
+// validId 同时排除 __proto__/constructor/prototype，防止存档 JSON 触发原型链污染。
 const validId = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9_-]{1,200}$/.test(value)
   && !['__proto__', 'constructor', 'prototype'].includes(value);
 const validLabel = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 160;
@@ -32,6 +37,7 @@ function record(value: unknown, error: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+/** 解析并校验单张图；仅接受已知字段，非 ROM 节点携带 words/programSource 会被拒绝。 */
 function parseGraph(raw: unknown): CircuitGraph {
   const graph = record(raw, '电路格式无效。');
   if (!Array.isArray(graph.nodes) || !Array.isArray(graph.wires) || graph.nodes.length > 2000 || graph.wires.length > 5000) {
@@ -97,6 +103,18 @@ function parseCircuit(raw: unknown, levelId: number, library: ComponentLibrary):
   return circuit;
 }
 
+/** 工坊草稿解析：levelId 必须为 0 哨兵值，走不绑定关卡端口的校验。 */
+function parseWorkshopCircuit(raw: unknown, library: ComponentLibrary): Circuit {
+  const value = record(raw, '工坊草稿格式无效。');
+  if (value.levelId !== 0 || !Number.isSafeInteger(value.revision) || (value.revision as number) < 0) {
+    throw new Error('工坊草稿格式或编号无效。');
+  }
+  const circuit: Circuit = { levelId: 0, revision: value.revision as number, ...parseGraph(value) };
+  const errors = validateWorkshopCircuit(circuit, library);
+  if (errors.length) throw new Error(errors[0]);
+  return circuit;
+}
+
 function parsePorts(raw: unknown): Port[] {
   if (!Array.isArray(raw) || raw.length > 128) throw new Error('组件接口格式无效。');
   return raw.map(value => {
@@ -137,10 +155,14 @@ function parseLibrary(raw: unknown): ComponentLibrary {
   return library;
 }
 
+/**
+ * 解析完整存档文本。v1–v5 老存档迁移：合并固定机器库补齐第 45–56 关依赖（同名被篡改的固定组件会在此暴露）；
+ * v6 起额外携带可选的元件工坊草稿。默认逐关重跑 judge 重验证明，全部通过才返回；verifyProofs:false 供测试跳过。
+ */
 export function parseWorkspace(text: string, options: { verifyProofs?: boolean } = {}): Workspace {
   if (text.length > 4_000_000) throw new Error('存档超过 4 MB 限制。');
   const raw = record(JSON.parse(text), '这不是兼容的逻辑工坊存档。');
-  if (raw.version !== 1 && raw.version !== 2 && raw.version !== 3 && raw.version !== 4 && raw.version !== 5) throw new Error('这不是兼容的逻辑工坊存档。');
+  if (![1, 2, 3, 4, 5, 6].includes(raw.version as number)) throw new Error('这不是兼容的逻辑工坊存档。');
   const circuits = record(raw.circuits, '存档缺少电路。');
   const proofs = raw.proofs === undefined ? {} : record(raw.proofs, '通关记录格式无效。');
   const inputs = raw.inputs === undefined ? {} : record(raw.inputs, '输入状态格式无效。');
@@ -148,7 +170,7 @@ export function parseWorkspace(text: string, options: { verifyProofs?: boolean }
   const savedLibrary = raw.version === 1 ? {} : record(raw.library, '组件库格式无效。');
   // New fixed drafts require canonical CPU dependencies. Preserve every saved version,
   // including same-key definitions; fixed-machine validation diagnoses conflicts.
-  workspace.library = parseLibrary(raw.version === 5 ? savedLibrary : { ...programmingMachineLibrary(), ...savedLibrary });
+  workspace.library = parseLibrary((raw.version as number) >= 5 ? savedLibrary : { ...programmingMachineLibrary(), ...savedLibrary });
   const maximumSavedLevel = raw.version === 1 ? 4 : raw.version === 2 ? 20 : raw.version === 3 ? 32 : raw.version === 4 ? 44 : 56;
   const checkLevelKeys = (value: Record<string, unknown>) => {
     if (Object.keys(value).some(key => !/^[1-9][0-9]*$/.test(key) || Number(key) > maximumSavedLevel)) {
@@ -178,6 +200,7 @@ export function parseWorkspace(text: string, options: { verifyProofs?: boolean }
   }
   let unlocked = levels.length;
   if (options.verifyProofs !== false) {
+    // 解锁进度 = 连续通过证明数 + 1；中断即丢弃其后的全部证明。
     const verified: Record<number, Circuit> = {};
     for (const level of levels) {
       const proof = workspace.proofs[level.id];
@@ -189,9 +212,11 @@ export function parseWorkspace(text: string, options: { verifyProofs?: boolean }
   }
   workspace.currentLevel = Number.isInteger(raw.currentLevel) && (raw.currentLevel as number) >= 1
     && (raw.currentLevel as number) <= unlocked ? raw.currentLevel as number : unlocked;
+  if (raw.workshop !== undefined) workspace.workshop = parseWorkshopCircuit(raw.workshop, workspace.library);
   return workspace;
 }
 
+/** 启动时读取 localStorage：无法解析内容时仍返回默认工作区，savedText 留给 Worker 异步重验。 */
 export function loadWorkspace(): { workspace: Workspace; savedText?: string; error?: string } {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -201,6 +226,7 @@ export function loadWorkspace(): { workspace: Workspace; savedText?: string; err
   }
 }
 
+/** 序列化为确定性 JSON（先清理不可达的已删除组件）；space 供导出可读文件。 */
 export function serializeWorkspace(workspace: Workspace, space?: number) {
   workspace = pruneDeletedComponents(workspace);
   const graph = (value: CircuitGraph): CircuitGraph => ({
@@ -223,7 +249,9 @@ export function serializeWorkspace(workspace: Workspace, space?: number) {
     ...(definition.deleted ? { deleted: true } : {}), graph: graph(definition.graph),
   }]));
   return JSON.stringify({ version: workspace.version, currentLevel: workspace.currentLevel,
-    circuits: circuits(workspace.circuits), proofs: circuits(workspace.proofs), inputs: workspace.inputs, library }, null, space);
+    circuits: circuits(workspace.circuits), proofs: circuits(workspace.proofs), inputs: workspace.inputs, library,
+    ...(workspace.workshop ? { workshop: { levelId: 0, revision: workspace.workshop.revision, ...graph(workspace.workshop) } } : {}),
+  }, null, space);
 }
 
 export function saveWorkspace(workspace: Workspace) {

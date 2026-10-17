@@ -1,11 +1,14 @@
+// 层级展开：把嵌套 COMPONENT 递归摊平为带实例路径的节点/导线列表，供两个仿真引擎与环检测共用。
 import type { CircuitGraph, CircuitNode, ComponentLibrary } from './contracts';
 import { getPorts } from './model';
 
 export interface Endpoint { id:string; port:string; }
+/** references 记录每个节点的端口如何映射到扁平图上的 Endpoint；device 为 undefined 表示该节点是组件边界。 */
 export interface References { inputs:Record<string,Endpoint>; outputs:Record<string,Endpoint>; device?:string; }
 export interface FlatNode { id:string; node:CircuitNode; root:boolean; }
 
 /** Interface nodes remain repeaters, so each component output retains its real dependency. */
+/** 扁平 id 为「路径/节点ID」，路径各段经 encodeURIComponent，因此组件实例状态天然按路径隔离。 */
 export function flattenGraph(graph:CircuitGraph,library:ComponentLibrary) {
   const nodes:FlatNode[]=[],wires:{from:Endpoint;to:Endpoint}[]=[];
   function flatten(graph:CircuitGraph,path:string[],root:boolean):Map<string,References> {
@@ -30,6 +33,7 @@ export function flattenGraph(graph:CircuitGraph,library:ComponentLibrary) {
   return {nodes,wires,references:flatten(graph,[],true)};
 }
 
+/** 拓扑排序检测组合环：DFF 的全部输入与 RAM 的写端口被豁免——经过存储元件的反馈是合法时序逻辑。 */
 export function hasCombinationalCycle(graph:CircuitGraph,library:ComponentLibrary):boolean {
   const {nodes,wires}=flattenGraph(graph,library),types=new Map(nodes.map(n=>[n.id,n.node.type]));
   const outgoing=new Map<string,string[]>(),indegree=new Map(nodes.map(n=>[n.id,0]));
@@ -50,6 +54,7 @@ export function hasCombinationalCycle(graph:CircuitGraph,library:ComponentLibrar
   return visited!==nodes.length;
 }
 
+/** 图中（含嵌套组件内）是否存在 DFF 或 RAM，决定关卡按组合还是时序电路判题。 */
 export function hasSequential(graph:CircuitGraph,library:ComponentLibrary={}):boolean {
   const visited=new Set<string>();
   function search(graph:CircuitGraph):boolean {

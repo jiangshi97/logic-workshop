@@ -1,3 +1,6 @@
+// 主线程侧的 Worker 封装，提供两种用法：
+// 1. backgroundTask：一次性 Worker，用于判题/证明重验/存档解析，支持 AbortSignal 取消；
+// 2. useSimulation：常驻 Worker 的 React Hook，驱动交互仿真，过期回包按请求 id 丢弃。
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Circuit, ComponentLibrary, Inputs, Simulation } from './contracts';
 import { programmingSessionKey } from './programmingMachine';
@@ -19,6 +22,10 @@ export function backgroundTask<T>(operation: 'judge' | 'verify' | 'load', payloa
 }
 
 const empty: Simulation = { values: {}, portValues: {}, wires: {} };
+/**
+ * 交互仿真 Hook：图（graphKey，含 epoch 用于强制重置）或输入变化时自动重算；
+ * tick/reset/replay/program* 为用户命令。回包 id 与最新请求不符时直接丢弃。
+ */
 export function useSimulation(circuit: Circuit, inputs: Inputs, library: ComponentLibrary, epoch = 0) {
   const [state, setState] = useState({ ...empty, error: '', pending: true });
   const workerRef = useRef<Worker | null>(null);

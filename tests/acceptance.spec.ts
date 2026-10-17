@@ -11,7 +11,7 @@ test.setTimeout(90_000);
 const browserErrors = new WeakMap<Page, string[]>();
 
 function completedWorkspace(current: number): Workspace {
-  const state: Workspace = { version: 5, currentLevel: current, library: architectureLibrary(), proofs: {},
+  const state: Workspace = { version: 6, currentLevel: current, library: architectureLibrary(), proofs: {},
     circuits: Object.fromEntries(levels.map(level => [level.id, createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, 0]))])) };
   for (const level of levels) {

@@ -1,3 +1,5 @@
+// 时序判题内核：在 GateKernel 外维护寄存器/RAM/周期计数，step() 与交互引擎同构——
+// 求值旧状态 → 采样全部存储元件 → 同时提交新状态 → 再求值。不含任何指令语义。
 import type { CircuitGraph, ComponentLibrary, Inputs, RuntimeState, Signal } from './contracts';
 import { compileGateKernel, maskSignal, mergeMasks, signalMask } from './combinationalEvaluator';
 import type { BitSignal } from './combinationalEvaluator';
@@ -40,6 +42,7 @@ export function compileSequential(graph:CircuitGraph,library:ComponentLibrary={}
           if(rst.known&&rst.value)return [m.key,Array(256).fill(zero)];
           const old=memories[m.key],next=[...old];
           if(!we.known||we.value){
+            // 地址/写使能含 X 时按位合并「写旧值」与「写新值」，与交互引擎的保守语义一致。
             const addr=kernel.read(m.addr,8),data=kernel.read(m.d,8),certain=we.known&&addr.known===255;
             for(let address=0;address<256;address++)if((address&addr.known)===addr.value)next[address]=certain?data:mergeMasks(old[address],data);
           }

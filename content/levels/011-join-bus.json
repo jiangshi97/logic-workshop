@@ -1,0 +1,12 @@
+{
+  "id": 11,
+  "title": "四位信号",
+  "caption": "组成一条总线",
+  "goal": "将 b0、b1、b2、b3 合成四位输出，b0 是最低位。",
+  "formula": "Y = b0 + 2b1 + 4b2 + 8b3",
+  "chapter": 3,
+  "inputs": [["b0", 1], ["b1", 1], ["b2", 1], ["b3", 1]],
+  "outputs": [["Y", 4]],
+  "hints": ["JOIN 把单个信号合成总线。", "第 0 位的权重为 1，第 3 位的权重为 8。", "把 b0 至 b3 分别连接 JOIN 的 in0 至 in3。"],
+  "combinational": { "expect": { "Y": "b0 + 2 * b1 + 4 * b2 + 8 * b3" } }
+}

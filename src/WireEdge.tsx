@@ -1,3 +1,4 @@
+// 导线渲染：按信号值着色（绿=1、灰=0、橙=X），失败反例相关导线标红；总线线宽更粗。
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps, type Edge } from '@xyflow/react';
 import type { Signal } from './simulator';
 

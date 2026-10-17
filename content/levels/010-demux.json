@@ -1,0 +1,13 @@
+{
+  "id": 10,
+  "title": "信号分配器",
+  "caption": "一位 DEMUX",
+  "goal": "S 为 0 时 (Y0,Y1)=(A,0)；S 为 1 时 (Y0,Y1)=(0,A)。",
+  "formula": "Y0 = A ∧ ¬S；Y1 = A ∧ S",
+  "chapter": 2,
+  "inputs": [["A", 1], ["S", 1]],
+  "outputs": [["Y0", 1], ["Y1", 1]],
+  "hints": ["两个输出分别控制 A 的一条通路。", "两条通路需要相反的选择信号。", "A 与 NOT(S) 接 AND 输出 Y0；A 与 S 接 AND 输出 Y1。"],
+  "rewardName": "DEMUX",
+  "combinational": { "expect": { "Y0": "S = 0 ? A : 0", "Y1": "S = 1 ? A : 0" } }
+}

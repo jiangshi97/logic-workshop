@@ -1,0 +1,13 @@
+{
+  "id": 17,
+  "title": "两位加法",
+  "caption": "串联进位",
+  "goal": "计算两位 A+B+Cin，Sum 保留两位，Cout 表示溢出。",
+  "formula": "Sum + 4Cout = A + B + Cin",
+  "chapter": 4,
+  "inputs": [["A", 2], ["B", 2], ["Cin", 1]],
+  "outputs": [["Sum", 2], ["Cout", 1]],
+  "hints": ["从最低位开始相加。", "低位全加器的 Cout 接高位全加器的 Cin。", "两个 Sum 按位序合成总线，高位 Cout 连接最终进位。"],
+  "rewardName": "Adder2",
+  "combinational": { "expect": { "Sum": "(A + B + Cin) mod 4", "Cout": "(A + B + Cin) div 4" } }
+}

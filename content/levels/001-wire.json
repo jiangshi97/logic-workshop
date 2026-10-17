@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "title": "点亮信号灯",
+  "caption": "让信号抵达终点",
+  "goal": "输出 Y 始终与输入 A 相同。",
+  "formula": "Y = A",
+  "chapter": 1,
+  "inputs": [["A", 1]],
+  "outputs": [["Y", 1]],
+  "hints": ["导线可以把输入信号传递到输出。", "从 A 右侧的端口连接到 Y 左侧的端口。", "直接连接 A 与 Y，不需要逻辑门。"],
+  "combinational": { "expect": { "Y": "A" } }
+}

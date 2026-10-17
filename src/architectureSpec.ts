@@ -1,3 +1,6 @@
+// 指令集规格（ISA 唯一权威）与架构阶段参考模型。
+// 16 位指令布局：Opcode[15:12] · Param[11:8] · Imm[7:0]，共 10 条指令；不满足保留位约束的编码为非法指令。
+// architectureOracle 是独立参考 CPU（三阶段状态机），期望值全部由此产生，不引用任何电路。
 import type { Inputs, Outputs } from './contracts';
 
 const instructionNames = ['NOP', 'MOVI', 'ADD', 'SUB', 'LOAD', 'STORE', 'JMP', 'JZ', 'OUT', 'HLT'];
@@ -15,10 +18,12 @@ export const instructionSet = [
   { opcode: 9, name: 'HLT', param: '必须为 0', immediate: '必须为 0', effect: '停机' },
 ] as const;
 
+/** 编码一条指令字：高 4 位操作码、中 4 位参数、低 8 位立即数。 */
 export function encodeInstruction(op: number, param = 0, imm = 0): number {
   return ((op & 15) << 12) | ((param & 15) << 8) | (imm & 255);
 }
 
+/** 译码并校验：MOVI 参数只允许 0/1，访存/跳转参数必须为 0，无立即数指令的 Imm 也必须为 0。 */
 export function decodeInstruction(word: number): { opcode: number; param: number; imm: number; valid: boolean; name: string } {
   const opcode = (word >>> 12) & 15, param = (word >>> 8) & 15, imm = word & 255;
   const valid = opcode === 1 ? param <= 1
@@ -41,11 +46,13 @@ export const architecturePrograms: { id: string; label: string; words: number[] 
   { id: 'reset-memory', label: '先读零值、停止后复位清空 RAM', words: [0x40ff, 0x8000, 0x10a5, 0x50ff, 0x9000] },
 ];
 
+/** 参考字节 ALU：op=0 加、1 减、2 AND、3 XOR，附带进位/借位与零标志。 */
 export function byteALU(A: number, B: number, op: number): Outputs {
   const Y = op === 0 ? (A + B) & 255 : op === 1 ? (A - B) & 255 : op === 2 ? A & B : A ^ B;
   return { Y, Carry: op === 0 && A + B > 255 ? 1 : 0, Borrow: op === 1 && A < B ? 1 : 0, Z: Y === 0 ? 1 : 0 };
 }
 
+/** 第 40 关指令控制器的数学期望：合法指令仅在 Phase=2 产生对应控制信号。 */
 export function instructionControl(i: Inputs): Outputs {
   const decoded = decodeInstruction(i.Instruction);
   const active = decoded.valid && i.Phase === 2;

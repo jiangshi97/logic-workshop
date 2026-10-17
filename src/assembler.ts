@@ -1,5 +1,7 @@
+// 汇编器与反汇编器：两遍扫描（先收集标签，再生成指令字）；纯文本转换，不涉及机器状态。
 import { decodeInstruction, encodeInstruction } from './architectureSpec';
 
+/** 汇编清单中的一行：地址、指令字、源行号与源文本。 */
 export interface AssemblyListing {
   address: number;
   word: number;
@@ -72,6 +74,7 @@ export function assemble(source: string): AssemblyResult {
   return { words: listing.map(row => row.word), listing, labels: Object.fromEntries(labels) };
 }
 
+/** 反汇编：用于把已保存的 ROM 字恢复成可编辑源码；遇到非法指令字则抛错。 */
 export function disassemble(words: number[]): string {
   if (words.length > 256) throw new Error('地址 256：程序最多容纳 256 个字。');
   return words.map((word, address) => {

@@ -1,3 +1,8 @@
+// 第 45–56 关的数学测试用例与参考汇编程序。
+// ProgramCase 的期望输出/内存全部是数学计算结果，独立于任何参考执行；参考源仅供试玩与对照。
+// 关卡编写 API（levelSpec）编译编程关时会登记用例到注册表，这里优先查询注册表再回退到旧 switch。
+import { programCaseRegistry, programSourceRegistry } from './levelSpec';
+
 export interface ProgramCase {
   id: string;
   label: string;
@@ -16,7 +21,10 @@ const fibonacci = (n: number): number => {
 };
 
 /** Expected values are mathematical results, independent of any reference execution. */
+/** 生成某关全部公开用例：输入写入 RAM 240 起，期望输出为完整 OUT 序列；maxCycles 是周期预算。 */
 export function programmingCases(id: number): ProgramCase[] {
+  const registered = programCaseRegistry.get(id);
+  if (registered) return registered;
   const result: ProgramCase[] = [];
   const add = (values: number[], output: number[], maxCycles: number, expectedMemory?: Record<number, number>, extraMemory: Record<number, number> = {}) => {
     result.push({ id: `program-${id}-${result.length + 1}`,
@@ -243,7 +251,10 @@ LOAD 245
 OUT
 HLT`;
 
+/** 第 45–56 关的参考汇编源（关卡 id → 源码），供示例存档与文档对照。 */
 export function programmingReferenceSource(id: number): string {
+  const registered = programSourceRegistry.get(id);
+  if (registered !== undefined) return registered;
   const source = sources[id];
   if (source === undefined) throw new Error('编程关卡不存在。');
   return source;

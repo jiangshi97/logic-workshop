@@ -1,0 +1,13 @@
+{
+  "id": 15,
+  "title": "半加器",
+  "caption": "同时输出和与进位",
+  "goal": "Sum 是 A+B 的最低位，Carry 是进位。",
+  "formula": "Sum = A ⊕ B；Carry = A ∧ B",
+  "chapter": 4,
+  "inputs": [["A", 1], ["B", 1]],
+  "outputs": [["Sum", 1], ["Carry", 1]],
+  "hints": ["两位相加时，结果可能需要两个输出位。", "XOR 决定最低位，AND 决定进位。", "A、B 同时接入 XOR 和 AND，分别输出 Sum 与 Carry。"],
+  "rewardName": "HalfAdder",
+  "combinational": { "expect": { "Sum": "(A + B) mod 2", "Carry": "(A + B) div 2" } }
+}

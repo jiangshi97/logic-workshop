@@ -531,3 +531,37 @@ td button { display: flex; gap: 4px; align-items: center; justify-content: cente
   .program-cases-footer { flex-wrap: wrap; }
   .programming-workshop .toolbar-meta, .programming-workshop .toolbar-title { display: none; }
 }
+
+/* —— 元件工坊：全屏覆盖层（左侧调色板 / 中间画布 / 右侧属性） —— */
+.workshop-overlay { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; background: #f7f8fa; }
+.workshop-header { min-height: 65px; flex-shrink: 0; display: flex; align-items: center; gap: 18px; padding: 8px 25px; background: #fff; border-bottom: 1px solid var(--border); }
+.workshop-header .workspace-location { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.workshop-header strong { font-size: 15px; }
+.workshop-hint { margin: 0 auto 0 0; font-size: 12px; color: #97a3a1; }
+.workshop-shell { flex: 1; display: flex; min-height: 0; }
+.workshop-palette { width: 236px; flex-shrink: 0; background: #fff; border-right: 1px solid var(--border); overflow-y: auto; padding: 14px 0; }
+.workshop-palette .sidebar-section-title { padding: 6px 15px 4px; margin-top: 8px; }
+.workshop-palette .sidebar-section-title:first-child { margin-top: 0; }
+.workshop-palette .component { padding-left: 15px; padding-right: 12px; }
+.workshop-palette .gate-symbol.small { display: inline-flex; width: 43px; height: 40px; align-items: center; justify-content: center; color: #273238; flex-shrink: 0; }
+.workshop-palette .bus-size { margin: 4px 15px 8px; }
+.workshop-board { flex: 1; position: relative; min-width: 0; }
+.workshop-board .react-flow { width: 100%; height: 100%; }
+.workshop-inspector { width: 248px; flex-shrink: 0; background: #fff; border-left: 1px solid var(--border); overflow-y: auto; }
+.workshop-inspector .properties-section { padding: 18px; }
+.workshop-inspector .empty-selection { padding: 24px 16px; text-align: center; color: #97a3a1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.workshop-inspector h3 { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #97a3a1; margin: 0 0 10px; }
+.workshop-inspector h1 { font-size: 17px; margin: 0 0 12px; }
+.workshop-inspector dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 12px; font-size: 12px; }
+.workshop-inspector dt { color: #97a3a1; }
+.workshop-inspector dd { margin: 0; font-family: ui-monospace, Consolas, monospace; }
+.workshop-inspector .secondary-button { width: 100%; justify-content: flex-start; margin-bottom: 8px; }
+.workshop-inspector .property-input { margin-bottom: 10px; }
+@media (max-width: 900px) { .workshop-inspector { display: none; } .workshop-hint { display: none; } }
+
+/* 组件库：家族分组 + 工坊入口 */
+.workshop-open-button { display: flex; align-items: center; gap: 8px; width: calc(100% - 30px); margin: 12px 15px 4px; padding: 9px 12px; border: 1px dashed #b9c4c6; border-radius: 8px; background: #f2f7f6; color: var(--green); font-weight: 600; cursor: pointer; }
+.workshop-open-button:hover { background: #e6f0ee; }
+.workshop-open-button .workshop-open-hint { margin-left: auto; font-weight: 400; font-size: 10px; color: #97a3a1; }
+.library-family { border-bottom: 1px solid #f0f2f3; }
+.library-family:last-of-type { border-bottom: none; }

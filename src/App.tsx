@@ -1,9 +1,12 @@
+// 工作区主界面：持有全部游戏状态（存档镜像、撤销历史、判题结果、选择与各类弹窗），
+// 组织左侧关卡/组件库栏、中间画布与测试面板、右侧任务面板。电路修改统一走 commit()（压撤销栈 + 取消后台任务）。
+// 判题与存档解析在 Worker 中执行（见 workerClient.ts）；交互仿真经 useSimulation 挂钩。
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, BackgroundVariant, useReactFlow, type Connection, type NodeChange, type EdgeChange } from '@xyflow/react';
 import { CircuitBoard, Check, ChevronRight, ArrowRight, Undo2, Redo2, Trash2, RotateCcw, Play, Pause, StepForward,
   ZoomIn, ZoomOut, Maximize, Download, Upload, LockKeyhole, Lightbulb, X, CircleCheck, CircleAlert,
-  Menu, SlidersHorizontal, Cable, Plus, BookOpen, MousePointer2, Copy, Package, UnfoldHorizontal, ChevronLeft, Clock3, Pencil, Eye, Replace } from 'lucide-react';
-import { addGate, addComponent, getPorts, validateCircuit, connect, canConnect, createCircuit, removeSelection, type Circuit } from './model';
+  Menu, SlidersHorizontal, Cable, Plus, BookOpen, MousePointer2, Copy, Package, UnfoldHorizontal, ChevronLeft, Clock3, Pencil, Eye, Replace, Wrench } from 'lucide-react';
+import { addGate, addComponent, getPorts, validateCircuit, connect, canConnect, createCircuit, createWorkshopCircuit, removeSelection, type Circuit } from './model';
 import { chapters, levels, getLevel, testInputs, testSequences, type GateType, type Inputs } from './levels';
 import type { TestResult, ComponentDefinition, ComponentLibrary } from './contracts';
 import { encapsulateSelection, expandComponent, packageCircuit } from './components';
@@ -21,6 +24,7 @@ import { instructionSet } from './architectureSpec';
 import { architectureLibrary } from './architectureCircuits';
 import { ProgrammingPanel } from './ProgrammingPanel';
 import { programmingCases } from './programmingSpec';
+import { WorkshopView } from './WorkshopView';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
 
@@ -35,6 +39,7 @@ function ToolButton({ label, children, onClick, disabled = false, active = false
 }
 
 function Workshop() {
+  // ---- 基础状态：存档、当前关卡与关卡派生信息 ----
   const [initial] = useState(loadWorkspace);
   const [verifyingInitial, setVerifyingInitial] = useState(initial.savedText !== undefined);
   const [workspace, setWorkspace] = useState(initial.workspace);
@@ -50,6 +55,7 @@ function Workshop() {
   })), []);
   const inspectionLibrary = useMemo(() => ({ ...teachingLibrary, ...workspace.library }), [teachingLibrary, workspace.library]);
   const inputs = workspace.inputs[current];
+  // ---- 编辑器状态：撤销历史、判题结果、连线/选择/提示/弹窗等 ----
   const [history, setHistory] = useState<Record<number, { past: Circuit[]; future: Circuit[] }>>({});
   const [result, setResult] = useState<TestResult | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -84,6 +90,8 @@ function Workshop() {
   const [programDirty, setProgramDirty] = useState(false);
   const [machineVisible, setMachineVisible] = useState(false);
   const [breakpoints, setBreakpoints] = useState<number[]>([]);
+  const [workshopOpen, setWorkshopOpen] = useState(false);
+  const [workshopEditing, setWorkshopEditing] = useState<ComponentDefinition | null>(null);
   const taskAbort = useRef<AbortController | null>(null);
   const taskId = useRef(0);
   const workspaceRef = useRef(workspace); workspaceRef.current = workspace;
@@ -95,6 +103,7 @@ function Workshop() {
   const restoreLevelScroll = useCallback((element: HTMLElement | null) => { if (element) element.scrollTop = sidebarScrollPositions.current.levels; }, []);
   const restoreLibraryScroll = useCallback((element: HTMLElement | null) => { if (element) element.scrollTop = sidebarScrollPositions.current.library; }, []);
   const flow = useReactFlow<FlowNode, FlowEdge>();
+  // 切关/切视野后等待 React Flow 完成节点量测再 fitView，避免对未量测节点计算视野。
   useEffect(() => {
     if (programming) return;
     let frame: number;
@@ -143,6 +152,7 @@ function Workshop() {
 
   const notify = useCallback((message: string) => setToast(message), []);
   const cancelTask = useCallback(() => { ++taskId.current; taskAbort.current?.abort(); taskAbort.current = null; setBusy(''); setVerifyingInitial(false); }, []);
+  // 首次载入：localStorage 里的旧存档需要在 Worker 中重验证明后才替换默认工作区。
   useEffect(() => {
     if (initial.savedText === undefined) return;
     const controller = new AbortController(); taskAbort.current = controller;
@@ -172,6 +182,7 @@ function Workshop() {
     return () => window.removeEventListener('pagehide', flush);
   }, [workspace, initial.workspace, verifyingInitial]);
 
+  // ---- 编辑提交：所有电路修改统一入口（压撤销栈、取消后台任务、写入工作区） ----
   const commit = useCallback((next: Circuit, previous = circuit) => {
     if (verifyingInitial) return;
     cancelTask();
@@ -266,6 +277,7 @@ function Workshop() {
     setPending(null);
   }, [pending, makeConnection, notify, circuit.nodes, workspace.library]);
 
+  // ---- 撤销/重做/删除/复制与全局快捷键 ----
   const undo = useCallback(() => {
     const h = history[current]; if (!h?.past.length) return;
     cancelTask();
@@ -313,6 +325,7 @@ function Workshop() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (workshopOpen) return; // 工坊覆盖层打开时，快捷键全部交给工坊内部处理。
       if (event.key === 'Escape') { setPending(null); setChapterOpen(false); setTaskOpen(false); setResetOpen(false); setPackageMode(null); setInspect(null); setRenameTarget(null); setDeleteTarget(null); setReplaceTarget(null); return; }
       if ((event.target as HTMLElement).closest('input, textarea, select') || resetOpen || packageMode || inspect || renameTarget || deleteTarget || replaceTarget) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); }
@@ -321,8 +334,9 @@ function Workshop() {
       if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); deleteSelected(); }
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo, deleteSelected, duplicateSelected, resetOpen, packageMode, inspect, renameTarget, deleteTarget, replaceTarget]);
+  }, [undo, redo, deleteSelected, duplicateSelected, resetOpen, packageMode, inspect, renameTarget, deleteTarget, replaceTarget, workshopOpen]);
 
+  // ---- 测试与关卡导航 ----
   const runTest = async () => {
     if (programming && programDirty) { notify('请先应用汇编修改。'); return; }
     if (hasDeletedComponents) { notify('当前电路包含已删除组件，请先将其移除。'); return; }
@@ -350,6 +364,7 @@ function Workshop() {
     } catch (error) { if ((error as Error).name !== 'AbortError') { setBusy(''); notify((error as Error).message); } }
   };
 
+  // ---- 组件库操作：保存/封装、放置（自动携带教学组件依赖）、重命名/删除/替换 ----
   const openPackage = (mode: 'selection' | 'whole') => { setPackageMode(mode); setComponentName(mode === 'whole' ? level.rewardName ?? level.title : '自定义组件'); };
   const saveComponent = () => {
     try {
@@ -390,6 +405,7 @@ function Workshop() {
     catch (error) { notify((error as Error).message); }
   };
 
+  // ---- 存档导入/导出 ----
   const exportSave = () => {
     const url = URL.createObjectURL(new Blob([serializeWorkspace(workspace, 2)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'logic-workshop-save.json'; a.click();
@@ -448,6 +464,7 @@ function Workshop() {
   const showFailure = !!(resultCurrent && result?.failure && level.inputs.every(name => result.failure!.inputs[name] === inputs[name])
     && (!temporal || (!simulation.pending && observedStep?.scenarioId === result.failure.scenarioId && observedStep?.stepIndex === result.failure.stepIndex && simulation.state?.cycle === result.failure.cycle)));
   // Retain dimensions on controlled updates so React Flow keeps visibility and handle bounds.
+  // ---- 画布数据：每次渲染重建受控节点/导线，信号值、待连线状态与失败高亮通过 data 下传 ----
   const flowNodes: FlowNode[] = circuit.nodes.map(node => ({ id: node.id, type: 'circuit', position: node.position,
     measured: nodeDimensions(node.type, getPorts(node, workspace.library)),
     selected: selection.nodes.includes(node.id), data: {
@@ -497,6 +514,32 @@ function Workshop() {
   const hasEditableSelection = !programming && circuit.nodes.some(n => selection.nodes.includes(n.id) && n.type !== 'INPUT' && n.type !== 'OUTPUT');
   const selectionUsesDeleted = circuit.nodes.some(n => selection.nodes.includes(n.id) && n.type === 'COMPONENT' && workspace.library[n.componentKey ?? '']?.deleted);
   const visibleLibraryEntries = Object.entries(workspace.library).filter(([key, definition]) => !definition.deleted && (!teachingLibrary[key] || (definition.sourceLevel ?? 0) < current));
+  // 组件库按名称家族分组：同名各版本聚合展示（最新在前），解决不同位宽/历史版本分散难找的问题。
+  const libraryFamilies = useMemo(() => {
+    const families = new Map<string, { key: string; definition: ComponentDefinition }[]>();
+    for (const entry of visibleLibraryEntries) {
+      const versions = families.get(entry[1].name) ?? [];
+      versions.push({ key: entry[0], definition: entry[1] });
+      families.set(entry[1].name, versions);
+    }
+    return [...families.entries()].map(([name, versions]) => ({
+      name,
+      versions: [...versions].sort((left, right) => right.definition.version - left.definition.version),
+    })).sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+  }, [visibleLibraryEntries]);
+  // 打开元件工坊：不传定义即继续/新建草稿；传入定义则载入其内部图供修改（同名保存出新版本）。
+  const openWorkshop = (definition?: ComponentDefinition) => {
+    if (busy === '验证通关记录') return;
+    cancelTask();
+    setWorkshopEditing(definition ?? null);
+    setWorkshopOpen(true);
+  };
+  const handleWorkshopDraft = useCallback((draft: Circuit) => {
+    setWorkspace(w => ({ ...w, workshop: draft }));
+  }, []);
+  const handleWorkshopLibrary = useCallback((library: ComponentLibrary) => {
+    setWorkspace(w => ({ ...w, library }));
+  }, []);
   const replaceableNode = !programming && selection.nodes.length === 1 && selectedNode?.type === 'COMPONENT' ? selectedNode : null;
   const replacementNode = replaceTarget ? circuit.nodes.find(node => node.id === replaceTarget && node.type === 'COMPONENT') : undefined;
   const replacementSource = replacementNode?.type === 'COMPONENT' ? workspace.library[replacementNode.componentKey ?? ''] : undefined;
@@ -549,12 +592,15 @@ function Workshop() {
           </button>)}
         </Fragment>)}
       </nav> : <section ref={restoreLibraryScroll} className="saved-components" aria-label="组件库" onScroll={event => { sidebarScrollPositions.current.library = event.currentTarget.scrollTop; }}>
-        {visibleLibraryEntries.map(([key, definition]) => <div className="library-item" key={key}>
+        <button className="workshop-open-button" aria-label="打开元件工坊" disabled={busy === '验证通关记录'} onClick={() => openWorkshop()}><Wrench size={15} /><span>元件工坊</span><span className="workshop-open-hint">自由搭建元件</span></button>
+        {libraryFamilies.map(family => <div className="library-family" key={family.name}>
+          {family.versions.map(({ key, definition }, index) => <div className="library-item" key={key} style={index ? { paddingLeft: 16 } : undefined}>
           <button className="component" aria-label={`添加组件 ${definition.name} v${definition.version}`} disabled={programming} draggable={!programming} onDragStart={e => e.dataTransfer.setData('application/logic-component', key)} onClick={() => placeComponent(key)}>
-            <Package size={23} /><span><strong>{definition.name}</strong><small>v{definition.version} · {definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>
+            <Package size={23} /><span><strong>{definition.name}</strong><small>v{definition.version}{index === 0 && family.versions.length > 1 ? ' · 最新' : ''} · {definition.inputs.length} 输入 / {definition.outputs.length} 输出</small></span><Plus size={15} /></button>
           <div className="library-actions"><ToolButton label="查看内部电路" onClick={() => setInspect(definition)}><Eye size={14} /></ToolButton>
-            {!teachingLibrary[key] && <><ToolButton label={`重命名 ${definition.name} v${definition.version}`} onClick={() => openRename(key)}><Pencil size={13} /></ToolButton><ToolButton label={`删除 ${definition.name} v${definition.version}`} onClick={() => openDelete(key)}><Trash2 size={13} /></ToolButton></>}
+            {!teachingLibrary[key] && <><ToolButton label={`在工坊中编辑 ${definition.name} v${definition.version}`} onClick={() => openWorkshop(definition)}><Wrench size={13} /></ToolButton><ToolButton label={`重命名 ${definition.name} v${definition.version}`} onClick={() => openRename(key)}><Pencil size={13} /></ToolButton><ToolButton label={`删除 ${definition.name} v${definition.version}`} onClick={() => openDelete(key)}><Trash2 size={13} /></ToolButton></>}
           </div>
+        </div>)}
         </div>)}
         {!visibleLibraryEntries.length && <p className="library-empty">组件库为空</p>}
       </section>}
@@ -712,6 +758,18 @@ function Workshop() {
       </div>
     </main>
     {(chapterOpen || taskOpen) && <button className="drawer-backdrop" aria-label="关闭侧栏" onClick={() => { setChapterOpen(false); setTaskOpen(false); }} />}
+    {workshopOpen && <WorkshopView
+      draft={workshopEditing
+        ? { levelId: 0, revision: 0, nodes: clone(workshopEditing.graph.nodes), wires: clone(workshopEditing.graph.wires) }
+        : workspace.workshop ?? createWorkshopCircuit()}
+      library={workspace.library}
+      teachingLibrary={teachingLibrary}
+      unlocked={unlocked}
+      editing={workshopEditing}
+      onClose={() => setWorkshopOpen(false)}
+      onDraft={handleWorkshopDraft}
+      onLibrary={handleWorkshopLibrary}
+      notify={notify} />}
     {toast && <div className="toast" role="status"><CircleAlert size={16} /><span>{toast}</span><button aria-label="关闭通知" onClick={() => setToast('')}><X size={14} /></button></div>}
     {packageMode && <div className="modal-backdrop" onClick={() => setPackageMode(null)}><section className="reset-dialog" role="dialog" aria-modal="true" aria-labelledby="package-title" onClick={e => e.stopPropagation()}><Package size={24} /><h2 id="package-title">{packageMode === 'whole' ? '保存电路为组件' : '封装所选组件'}</h2><label className="property-input">组件名称<input autoFocus aria-label="组件名称" maxLength={60} value={componentName} onChange={e => setComponentName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveComponent(); if (e.key === 'Escape') setPackageMode(null); }} /></label><div><button className="secondary-button" onClick={() => setPackageMode(null)}>取消</button><button className="test-button" onClick={saveComponent}>保存组件</button></div></section></div>}
     {renameTarget && <div className="modal-backdrop" onClick={() => setRenameTarget(null)}><section className="reset-dialog" role="dialog" aria-modal="true" aria-labelledby="rename-component-title" onClick={e => e.stopPropagation()}><Pencil size={24} /><h2 id="rename-component-title">重命名组件</h2><label className="property-input">组件名称<input autoFocus aria-label="新的组件名称" maxLength={60} value={renameName} onChange={e => setRenameName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyRename(); if (e.key === 'Escape') setRenameTarget(null); }} /></label><p>关卡和其他组件中使用的此版本会同时更新名称。</p><div><button className="secondary-button" onClick={() => setRenameTarget(null)}>取消</button><button className="test-button" onClick={applyRename}>确认重命名</button></div></section></div>}

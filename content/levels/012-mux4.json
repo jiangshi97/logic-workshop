@@ -1,0 +1,13 @@
+{
+  "id": 12,
+  "title": "四位选择器",
+  "caption": "并行复用 MUX",
+  "goal": "S 为 0 时 Y=A；S 为 1 时 Y=B，A、B、Y 均为四位数。",
+  "formula": "Y = S ? B : A",
+  "chapter": 3,
+  "inputs": [["A", 4], ["B", 4], ["S", 1]],
+  "outputs": [["Y", 4]],
+  "hints": ["用 SPLIT 将 A、B 拆成对应的四个位。", "四个位分别接入一位 MUX，它们共享 S。", "将四个选择结果按相同位序接入 JOIN。"],
+  "rewardName": "MUX4",
+  "combinational": { "expect": { "Y": "S = 0 ? A : B" } }
+}

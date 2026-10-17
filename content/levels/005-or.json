@@ -1,0 +1,13 @@
+{
+  "id": 5,
+  "title": "任一确认",
+  "caption": "组合出 OR",
+  "goal": "A、B 中至少一个为 1 时，Y 为 1。",
+  "formula": "Y = A ∨ B",
+  "chapter": 2,
+  "inputs": [["A", 1], ["B", 1]],
+  "outputs": [["Y", 1]],
+  "hints": ["先反转两个输入，再观察 NAND 的结果。", "德摩根关系把“或”转化为“与非”。", "A、B 分别接 NOT，再接入同一个 NAND。"],
+  "rewardName": "OR",
+  "combinational": { "expect": { "Y": "A | B" } }
+}

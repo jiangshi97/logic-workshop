@@ -1,3 +1,5 @@
+// React Flow 节点渲染：端口（Handle）、信号着色、门符号 SVG、输入开关/总线输入框。
+// 端口同时承担「连线锚点」与「点击连线」两种交互（onPort 回调）。
 import { Handle, Position, useUpdateNodeInternals, type NodeProps, type Node } from '@xyflow/react';
 import { useEffect, useState } from 'react';
 import { Lightbulb, Power, LockKeyhole, Package, Split, Combine, Hash, MemoryStick } from 'lucide-react';
@@ -7,11 +9,12 @@ export interface CircuitNodeData extends Record<string, unknown> {
   kind: NodeType; label: string; value: Signal; bits: number;
   ports: { inputs: Port[]; outputs: Port[] }; portValues: Record<string, Signal>;
   inputValues: Record<string, Signal>; pending: string | null; failed: boolean;
-  readOnly?: boolean; deleted?: boolean;
+  readOnly?: boolean; deleted?: boolean; freeInterface?: boolean;
   onToggle: (id: string) => void; onValue: (id: string, value: number) => void;
   onPort: (id: string, handle: string, direction: 'input' | 'output') => void;
 }
 export type FlowNode = Node<CircuitNodeData, 'circuit'>;
+/** 节点渲染尺寸：组件/存储元件更宽，高度随端口数增长；App 用它做画布预量测与空位计算。 */
 export function nodeDimensions(kind: NodeType, ports: { inputs: Port[]; outputs: Port[] }) {
   return { width: ['COMPONENT', 'DFF', 'ROM', 'RAM'].includes(kind) ? 180 : 130, height: Math.max(106, 46 + Math.max(ports.inputs.length, ports.outputs.length) * 25) };
 }
@@ -19,6 +22,7 @@ export function portTop(index: number, total: number) {
   return total <= 2 ? (total === 2 ? 48 + index * 28 : 62) : 48 + index * 25;
 }
 
+/** 门符号：组合门用 SVG 绘制经典形状，SPLIT/JOIN/CONST 与存储元件用图标。 */
 export function GateSymbol({ type, small = false }: { type: GateType; small?: boolean }) {
   if (type === 'DFF' || type === 'ROM' || type === 'RAM') return <MemoryStick className={small ? 'gate-symbol small' : 'gate-symbol'} aria-label={type === 'DFF' ? 'DFF 触发器' : `${type} 存储器`} />;
   if (type === 'SPLIT' || type === 'JOIN' || type === 'CONST') {
@@ -84,6 +88,6 @@ export function CircuitNodeView({ id, data, selected }: NodeProps<FlowNode>) {
       : <div className={`gate-body ${['COMPONENT', 'DFF', 'ROM', 'RAM'].includes(data.kind) ? 'component-body' : ''} ${data.kind === 'SPLIT' || data.kind === 'JOIN' ? 'bus-body' : ''}`}>{data.kind === 'COMPONENT' ? <Package size={24} /> : <GateSymbol type={data.kind as GateType} />}<span className="node-signal">{displayValue}</span></div>}
     {data.ports.inputs.map((p, i) => port(p, 'input', i, data.ports.inputs.length))}
     {data.ports.outputs.map((p, i) => port(p, 'output', i, data.ports.outputs.length))}
-    {(isInput || isOutput) && <span className="fixed-marker" title="关卡固定端口"><LockKeyhole size={9} /></span>}
+    {(isInput || isOutput) && !data.freeInterface && <span className="fixed-marker" title="关卡固定端口"><LockKeyhole size={9} /></span>}
   </div>;
 }

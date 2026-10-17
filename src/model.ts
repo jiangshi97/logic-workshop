@@ -1,12 +1,15 @@
+// 电路领域模型：端口形状、关卡初始电路、全部合法性校验，以及增删连线的原子操作。
+// 所有修改电路的函数都遵循「先构造 next、再 validateCircuit、有错即抛」的模式，保证电路恒为合法状态。
 import { getLevel } from './levels';
 import { createId } from './id';
 import { hasCombinationalCycle } from './netlist';
 import { isProgrammingLevel, programmingMachine, validateProgrammingMachine } from './programmingMachine';
+import { gateTypes } from './gates';
 import type { Circuit, CircuitGraph, CircuitNode, ComponentLibrary, GateType, NodeType, Port } from './contracts';
 export type { Circuit, CircuitGraph, CircuitNode, Wire, NodeType } from './contracts';
 
-const gateTypes: GateType[] = ['NAND','NOT','AND','OR','XOR','XNOR','CONST','SPLIT','JOIN','DFF','ROM','RAM'];
 const p = (id: string, bits: number): Port => ({ id, label:id, bits });
+/** 每种节点类型的端口形状（id/位宽）唯一由此函数决定；COMPONENT 的形状来自组件库定义。 */
 export function getPorts(node: CircuitNode, library: ComponentLibrary = {}): { inputs: Port[]; outputs: Port[] } {
   const bits = node.bits ?? 1;
   if (node.type === 'COMPONENT') {
@@ -27,6 +30,7 @@ export function ports(type: NodeType) {
   const typed = getPorts({ id:'',type,label:'',position:{x:0,y:0} });
   return { inputs:typed.inputs.map(port=>port.id), outputs:typed.outputs.map(port=>port.id) };
 }
+/** 生成一关的初始电路：固定 INPUT/OUTPUT 端口；编程关卡返回固定 CPU；第 38/44 关额外带 ROM 节点（id 固定为 program）。 */
 export function createCircuit(levelId: number): Circuit {
   if(isProgrammingLevel(levelId))return programmingMachine(levelId);
   const level = getLevel(levelId);
@@ -36,6 +40,7 @@ export function createCircuit(levelId: number): Circuit {
     ...([38,44].includes(levelId)?[{id:'program',label:'ROM',type:'ROM' as const,bits:16,words:[...(level.defaultProgram??[])],position:{x:380,y:70}}]:[]),
   ] };
 }
+/** 单张图的结构校验：ID、类型、位宽、常量范围、ROM 字、导线方向与位宽一致、输入端口禁止多驱动、规模上限。 */
 function validateGraph(graph: CircuitGraph, library: ComponentLibrary): string[] {
   const errors: string[] = [];
   if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.wires)) return ['组件图无效。'];
@@ -71,6 +76,7 @@ function validateGraph(graph: CircuitGraph, library: ComponentLibrary): string[]
   }
   return errors;
 }
+/** 组件库校验：键与 id@version 一致、接口与内部电路边界一致、依赖清单一致、递归/展开规模检测、组合环检测。 */
 export function validateLibrary(library: ComponentLibrary): string[] {
   if (!library || typeof library!=='object' || Array.isArray(library)) return ['组件库无效。'];
   const entries=Object.entries(library), errors:string[]=[];
@@ -98,6 +104,7 @@ export function validateLibrary(library: ComponentLibrary): string[] {
     if (JSON.stringify(actual)!==JSON.stringify([...new Set(def.dependencies)].sort())) errors.push('组件依赖清单不一致。');
   }
   const memo=new Map<string,{nodes:number;wires:number;depth:number}>(), active=new Set<string>();
+  // measure 递归统计每个组件展开后的总节点/导线数与嵌套深度，越限即拒绝。
   function measure(key:string): {nodes:number;wires:number;depth:number} {
     if (active.has(key)) throw new Error('组件依赖存在递归循环。');
     if (memo.has(key)) return memo.get(key)!;
@@ -115,6 +122,7 @@ export function validateLibrary(library: ComponentLibrary): string[] {
   if (!errors.length) for (const [,def] of entries) if (hasCombinationalCycle(def.graph,library)) errors.push('组合电路不能形成反馈回路。');
   return [...new Set(errors)];
 }
+/** 关卡电路总校验：图结构 + 组件库 + 固定端口未被改动 + 只用本关解锁的门 + 额外输入输出拒绝 + 展开规模与组合环。 */
 export function validateCircuit(circuit: Circuit, library: ComponentLibrary = {}): string[] {
   const errors=validateLibrary(library);
   if (!circuit||!Array.isArray(circuit.nodes)||!Array.isArray(circuit.wires)||circuit.nodes.some(n=>!n||typeof n!=='object')) return [...errors,'电路结构无效。'];
@@ -128,6 +136,7 @@ export function validateCircuit(circuit: Circuit, library: ComponentLibrary = {}
     if (!actual||actual.type!==expected.type||actual.label!==expected.label||(actual.bits??1)!==expected.bits) errors.push(`固定端口 ${expected.id} 缺失或被修改。`);
   }
   let expandedNodes=circuit.nodes.length,expandedWires=circuit.wires.length;
+  // check 递归累加嵌套组件的展开规模，并确认所有非接口节点都在本关允许的门类型列表内。
   const check=(graph:CircuitGraph,depth:number) => {
     if (depth>16) { errors.push('组件展开超过深度限制。');return; }
     for (const n of graph.nodes) {
@@ -144,25 +153,52 @@ export function validateCircuit(circuit: Circuit, library: ComponentLibrary = {}
   for (const n of circuit.nodes) if ((n.type==='INPUT'||n.type==='OUTPUT')&&!fixed.some(f=>f.id===n.id)) errors.push('不允许添加额外的输入输出。');
   return [...new Set(errors)];
 }
-export function addGate(circuit:Circuit,type:GateType,position:CircuitNode['position'],id=createId('g'),library:ComponentLibrary={},bits=1): Circuit {
-  const next={...circuit,revision:circuit.revision+1,nodes:[...circuit.nodes,{id,type,label:type,position,bits:type==='ROM'?16:type==='RAM'?8:bits,...(type==='ROM'?{words:[]}: {})}]};
-  const error=validateCircuit(next,library)[0];if(error) throw new Error(error);return next;
+// —— 元件工坊（levelId=0 的哨兵电路）——
+/** 工坊草稿不绑定关卡端口：INPUT/OUTPUT 可自由添加（它们就是未来组件的接口声明），全部门型可用，仍受规模与组合环约束。 */
+export function validateWorkshopCircuit(circuit: Circuit, library: ComponentLibrary = {}): string[] {
+  const errors = validateLibrary(library);
+  if (!circuit || !Array.isArray(circuit.nodes) || !Array.isArray(circuit.wires) || circuit.nodes.some(n => !n || typeof n !== 'object')) return [...errors, '电路结构无效。'];
+  errors.push(...validateGraph(circuit, library));
+  let expandedNodes = circuit.nodes.length, expandedWires = circuit.wires.length;
+  const check = (graph: CircuitGraph, depth: number) => {
+    if (depth > 16) { errors.push('组件展开超过深度限制。'); return; }
+    for (const n of graph.nodes) if (n.type === 'COMPONENT') {
+      const def = library[n.componentKey ?? '']; if (!def) continue;
+      expandedNodes += def.graph.nodes.length; expandedWires += def.graph.wires.length;
+      if (expandedNodes > 2000 || expandedWires > 5000) { errors.push('组件展开超过规模限制。'); return; }
+      check(def.graph, depth + 1);
+    }
+  };
+  if (!errors.length) check(circuit, 0);
+  if (!errors.length && hasCombinationalCycle(circuit, library)) errors.push('组合电路不能形成反馈回路。');
+  return [...new Set(errors)];
 }
-export function addComponent(circuit:Circuit,key:string,position:CircuitNode['position'],library:ComponentLibrary,id=createId('c')): Circuit {
+/** 新建空白工坊草稿：levelId=0 表示不隶属于任何关卡，存档独立保存于 Workspace.workshop。 */
+export function createWorkshopCircuit(): Circuit {
+  return { levelId: 0, revision: 0, nodes: [], wires: [] };
+}
+/** 添加一个门并整体校验；ROM/RAM 位宽固定，其余使用传入位宽。workshop 模式额外允许 INPUT/OUTPUT 接口节点。 */
+export function addGate(circuit:Circuit,type:GateType|'INPUT'|'OUTPUT',position:CircuitNode['position'],id=createId('g'),library:ComponentLibrary={},bits=1,workshop=false): Circuit {
+  const next={...circuit,revision:circuit.revision+1,nodes:[...circuit.nodes,{id,type,label:type,position,bits:type==='ROM'?16:type==='RAM'?8:bits,...(type==='ROM'?{words:[]}: {})}]};
+  const error=(workshop?validateWorkshopCircuit(next,library):validateCircuit(next,library))[0];if(error) throw new Error(error);return next;
+}
+export function addComponent(circuit:Circuit,key:string,position:CircuitNode['position'],library:ComponentLibrary,id=createId('c'),workshop=false): Circuit {
   const def=library[key];if(!def)throw new Error('组件依赖缺失。');
   if(def.deleted)throw new Error('组件已删除，不能继续使用。');
   const next={...circuit,revision:circuit.revision+1,nodes:[...circuit.nodes,{id,type:'COMPONENT' as const,label:def.name,componentKey:key,position}]};
-  const error=validateCircuit(next,library)[0];if(error)throw new Error(error);return next;
+  const error=(workshop?validateWorkshopCircuit(next,library):validateCircuit(next,library))[0];if(error) throw new Error(error);return next;
 }
-export function connect(circuit:Circuit,source:string,sourceHandle:string,target:string,targetHandle:string,library:ComponentLibrary={}):Circuit {
+/** 连一条导线（输出端口 → 输入端口）；canConnect 通过试连做交互预检。 */
+export function connect(circuit:Circuit,source:string,sourceHandle:string,target:string,targetHandle:string,library:ComponentLibrary={},workshop=false): Circuit {
   const next={...circuit,revision:circuit.revision+1,wires:[...circuit.wires,{id:createId('w'),source,sourceHandle,target,targetHandle}]};
-  const error=validateCircuit(next,library)[0];if(error)throw new Error(error);return next;
+  const error=(workshop?validateWorkshopCircuit(next,library):validateCircuit(next,library))[0];if(error) throw new Error(error);return next;
 }
-export function canConnect(circuit:Circuit,source:string,sourceHandle:string,target:string,targetHandle:string,library:ComponentLibrary={}):boolean {
-  try { connect(circuit,source,sourceHandle,target,targetHandle,library);return true; } catch { return false; }
+export function canConnect(circuit:Circuit,source:string,sourceHandle:string,target:string,targetHandle:string,library:ComponentLibrary={},workshop=false):boolean {
+  try { connect(circuit,source,sourceHandle,target,targetHandle,library,workshop);return true; } catch { return false; }
 }
-export function removeSelection(circuit:Circuit,nodeIds:string[],wireIds:string[]):Circuit {
-  if(isProgrammingLevel(circuit.levelId))return circuit;
-  const removable=new Set(circuit.nodes.filter(n=>n.type!=='INPUT'&&n.type!=='OUTPUT'&&!([38,44].includes(circuit.levelId)&&n.id==='program')&&nodeIds.includes(n.id)).map(n=>n.id));
+/** 删除选中内容：编程关卡不可编辑；固定端口与第 38/44 关的 program ROM 不可删除，悬空导线一并清理。工坊模式下一切可删。 */
+export function removeSelection(circuit:Circuit,nodeIds:string[],wireIds:string[],workshop=false): Circuit {
+  if(!workshop&&isProgrammingLevel(circuit.levelId))return circuit;
+  const removable=new Set(circuit.nodes.filter(n=>workshop?nodeIds.includes(n.id):(n.type!=='INPUT'&&n.type!=='OUTPUT'&&!([38,44].includes(circuit.levelId)&&n.id==='program')&&nodeIds.includes(n.id))).map(n=>n.id));
   return {...circuit,revision:circuit.revision+1,nodes:circuit.nodes.filter(n=>!removable.has(n.id)),wires:circuit.wires.filter(w=>!wireIds.includes(w.id)&&!removable.has(w.source)&&!removable.has(w.target))};
 }

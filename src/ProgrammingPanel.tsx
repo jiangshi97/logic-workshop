@@ -1,3 +1,5 @@
+// 汇编工作台（第 45–56 关）：源码编辑与实时汇编、指令断点、E/R 直接操作、RAM 分页观察、
+// 输出事件记录与公开用例表；dirty 状态下禁止运行，需先「应用汇编」把 words 与源码一起写入 ROM 节点。
 import { useEffect, useMemo, useState } from 'react';
 import { Check, CircleAlert, Code2, ChevronLeft, ChevronRight, Play, Pause, StepForward, RotateCcw } from 'lucide-react';
 import type { CircuitNode, Inputs, Simulation, TestResult, TestRow } from './contracts';
@@ -5,6 +7,7 @@ import { assemble, disassemble } from './assembler';
 import { programmingCases } from './programmingSpec';
 import { instructionLabel } from './ArchitecturePanel';
 
+/** 取 ROM 节点的汇编源：优先已保存的 programSource，否则尝试反汇编 words。 */
 function sourceOf(node: CircuitNode): string {
   if (node.programSource !== undefined) return node.programSource;
   try { return disassemble(node.words ?? []); }

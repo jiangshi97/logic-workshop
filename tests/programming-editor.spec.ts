@@ -24,7 +24,7 @@ async function exported(page: Page): Promise<Workspace> {
   return JSON.parse(await readFile(path, 'utf8'));
 }
 async function at(page: Page, id: number) {
-  const state: Workspace = { version: 5, currentLevel: id, library: architectureLibrary(), circuits: {}, proofs: {}, inputs: {} };
+  const state: Workspace = { version: 6, currentLevel: id, library: architectureLibrary(), circuits: {}, proofs: {}, inputs: {} };
   for (const level of levels) {
     state.circuits[level.id] = referenceCircuit(level.id);
     state.inputs[level.id] = Object.fromEntries(level.inputs.map(name => [name, level.mode === 'program' && name === 'E' ? 1 : 0]));
@@ -112,7 +112,7 @@ test('case initialization, RAM writes, output history and source survive save wh
   await expect(page.getByTestId('ram-242')).toHaveText('255');
   await instruction(page, 9); await expect(page.getByTestId('program-output-events')).toHaveText('255');
   const saved = await exported(page);
-  expect(saved.version).toBe(5); expect(Object.keys(saved.circuits)).toHaveLength(56);
+  expect(saved.version).toBe(6); expect(Object.keys(saved.circuits)).toHaveLength(56);
   expect(saved.library['architecture-datapath@1']).toBeDefined();
   expect(saved).not.toHaveProperty('program'); expect(saved).not.toHaveProperty('runtime'); expect(saved).not.toHaveProperty('breakpoints');
   await page.locator('input[type=file]').setInputFiles({ name: 'roundtrip.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)) });

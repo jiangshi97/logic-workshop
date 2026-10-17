@@ -33,7 +33,7 @@ it('migrates v3 to fifty-six drafts while preserving proofs and saved input valu
   legacy.proofs[1] = structuredClone(legacy.circuits[1]);
   legacy.inputs[24] = { D: 255, E: 1, R: 0 };
   const restored = parseWorkspace(JSON.stringify(legacy));
-  expect(restored.version).toBe(5);
+  expect(restored.version).toBe(6);
   expect(Object.keys(restored.circuits)).toHaveLength(56);
   expect(restored.currentLevel).toBe(2);
   expect(restored.circuits[1]).toEqual(legacy.circuits[1]);
@@ -55,7 +55,7 @@ it('imports the historical v3 demonstration without rewriting its saved drafts',
   const original = JSON.parse(text);
   expect(original.version).toBe(3);
   const restored = parseWorkspace(text, { verifyProofs: false });
-  expect(restored.version).toBe(5);
+  expect(restored.version).toBe(6);
   expect(Object.keys(restored.circuits)).toHaveLength(56);
   expect(restored.currentLevel).toBe(original.currentLevel);
   expect(restored.proofs).toEqual(original.proofs);

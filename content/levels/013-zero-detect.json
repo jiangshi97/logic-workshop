@@ -1,0 +1,13 @@
+{
+  "id": 13,
+  "title": "零值检测",
+  "caption": "检查所有位",
+  "goal": "仅当四位输入 A 等于 0 时，Z 为 1。",
+  "formula": "Z = (A = 0)",
+  "chapter": 3,
+  "inputs": [["A", 4]],
+  "outputs": [["Z", 1]],
+  "hints": ["零值意味着所有位都为 0。", "将各个位 OR 起来可以判断是否存在一个 1。", "SPLIT 拆位，通过 OR 合并四位，再用 NOT 反转。"],
+  "rewardName": "Zero4",
+  "combinational": { "expect": { "Z": "A = 0" } }
+}

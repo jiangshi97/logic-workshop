@@ -1,0 +1,13 @@
+{
+  "id": 8,
+  "title": "多数表决",
+  "caption": "三人投票",
+  "goal": "A、B、C 至少两个为 1 时，Y 为 1。",
+  "formula": "Y = AB ∨ AC ∨ BC",
+  "chapter": 2,
+  "inputs": [["A", 1], ["B", 1], ["C", 1]],
+  "outputs": [["Y", 1]],
+  "hints": ["列出所有两人同时同意的组合。", "分别计算 AB、AC 和 BC。", "把三个 AND 的结果通过 OR 合并。"],
+  "rewardName": "多数表决",
+  "combinational": { "expect": { "Y": "A + B + C >= 2" } }
+}

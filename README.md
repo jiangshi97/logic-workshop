@@ -107,9 +107,14 @@ CPU与组件依赖固定，允许移动布局、观察内部电路和编写程�
 设计见[编程应用方案](docs/programming-applications-design.md)，验收见[编程应用验收](docs/programming-applications-acceptance.md)。阶段完成后暂停，供用户试玩。
 ## 主要文件
 
+面向开发者的完整代码导读（架构分层、数据流、判题管线、存档与组件系统、常见修改指引）见 [代码导读](docs/code-guide.md)；新增关卡的声明式写法（JSON 数据 + 期望值表达式）见 [关卡编写指南](docs/level-authoring.md)。
+
 | 文件 | 职责 |
 |---|---|
-| src/levels.ts | 全部关卡目录与前 20 关数学期望 |
+| content/levels/ | 声明式关卡（第 1–20 关 JSON 数据，期望值为独立数学表达式） |
+| src/levelSpec.ts、src/levelExpr.ts、src/levelRegistry.ts | 关卡编写 API：校验、编译与表达式求值 |
+| src/WorkshopView.tsx | 元件工坊：独立于关卡自由搭建/修改自定义组件 |
+| src/levels.ts | 关卡目录与四阶段聚合 |
 | src/sequentialLevels.ts | 第 21–32 关与独立时序参考场景 |
 | src/architectureLevels.ts、src/architectureSpec.ts | 第33–44关、指令规格、独立状态机和程序测试 |
 | src/architectureCircuits.ts | 可查看的门级教学组件与合法参考电路 |

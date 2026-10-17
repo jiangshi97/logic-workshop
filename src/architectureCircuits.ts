@@ -1,3 +1,7 @@
+// 教学组件库与参考电路：用 Builder DSL 生成 23 个可查看、可展开的门级组件
+// （mux1–16、register1–16、adder8、increment8、addsub、alu、registers、pc、decode、predecode、
+//  phase、controller、output、datapath、fetch、memory、computer）及第 33–44 关参考电路。
+// architectureLibrary() 每次返回全新对象，调用方可安全保存/修改自己的副本。
 import type { Circuit, CircuitGraph, CircuitNode, ComponentDefinition, ComponentLibrary, GateType, Port } from './contracts';
 import { getLevel } from './levels';
 
@@ -7,6 +11,7 @@ const key = (id: string) => `architecture-${id}@1`;
 const ports = (spec: Spec): Port[] => spec.map(([id, bits]) => ({ id, label: id, bits }));
 
 /** Small, inspectable gates and state cells; component interfaces are real graph boundaries. */
+/** 电路搭建 DSL：gate/not/and/or/split/join/mux/reg/dff/component 等原语，产出标准 CircuitGraph。 */
 class Builder {
   graph: CircuitGraph = { nodes: [], wires: [] };
   count = 0;
@@ -210,6 +215,7 @@ function layoutMachine(graph: CircuitGraph, id: number) {
 }
 
 /** The CPU deliberately exposes its timing, PC, instruction register, ROM, RAM and data path. */
+/** 生成某关的参考电路：33–43 关为单个教学模块直连；41 关为 RAM；38/44 关为手工连接的取指/整机图。 */
 export function architectureReferenceCircuit(id: number): Circuit {
   const level = getLevel(id), spec = (list: Port[]): Spec => list.map(p => [p.id, p.bits]);
   const b = new Builder(spec(level.inputPorts), spec(level.outputPorts));

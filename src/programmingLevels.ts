@@ -1,3 +1,5 @@
+// 第 45–56 关（编程应用）：接口复用第 44 关整机，mode='program'。
+// expected/expectedOutputs 只是占位；判题完全由 programmingRunner 消费 ProgramCase 的数学结果。
 import type { Level } from './levels';
 import { architectureLevels } from './architectureLevels';
 
@@ -19,11 +21,10 @@ const lessons: Lesson[] = [
 ];
 
 export const programmingLevels: Level[] = lessons.map(([title, caption, goal, formula, hints], index) => ({
-  id: 45 + index, title, caption, story: goal, goal, formula, chapter: 7,
+  id: 45 + index, title, caption, goal, formula, chapter: 7,
   inputs: [...machine.inputs], inputPorts: machine.inputPorts.map(port => ({ ...port })),
   outputPorts: machine.outputPorts.map(port => ({ ...port })), allowed: [...machine.allowed],
   hints, mode: 'program', defaultProgram: [],
   // Program judging consumes mathematical ProgramCase outputs, never these register placeholders.
-  expected: () => 0,
   expectedOutputs: () => Object.fromEntries(machine.outputPorts.map(port => [port.id, 0])),
 }));

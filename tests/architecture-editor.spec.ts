@@ -8,7 +8,7 @@ import { referenceCircuit } from './fixtures';
 
 test.setTimeout(240_000);
 function stateAt(id: number): Workspace {
-  const state: Workspace = { version: 5, currentLevel: id, library: architectureLibrary(), proofs: {}, circuits: {}, inputs: {} };
+  const state: Workspace = { version: 6, currentLevel: id, library: architectureLibrary(), proofs: {}, circuits: {}, inputs: {} };
   for (const level of levels) {
     state.circuits[level.id] = referenceCircuit(level.id);
     state.inputs[level.id] = Object.fromEntries(level.inputs.map(p => [p, 0]));
@@ -66,7 +66,7 @@ test('a migrated stage-five save unlocks architecture and lets users place 16-bi
   await page.getByRole('button', { name: '关闭组件详情', exact: true }).click();
   await page.getByRole('button', { name: '添加教学组件 八位使能寄存器', exact: true }).click();
   const saved = await exported(page);
-  expect(saved.version).toBe(5);
+  expect(saved.version).toBe(6);
   expect(saved.library['architecture-register8@1'].dependencies).toContain('architecture-mux8@1');
   expect(saved.library['architecture-mux8@1']).toBeDefined();
   await page.getByRole('button', { name: '撤销', exact: true }).click();

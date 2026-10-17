@@ -24,7 +24,7 @@ it('migrates v2 drafts, inputs, proofs and component versions while adding thirt
     circuits: Object.fromEntries(Object.entries(workspace.circuits).filter(([id]) => Number(id) <= 20)),
     inputs: Object.fromEntries(Object.entries(workspace.inputs).filter(([id]) => Number(id) <= 20)) };
   const restored = parseWorkspace(JSON.stringify(legacy));
-  expect(restored.version).toBe(5);
+  expect(restored.version).toBe(6);
   expect(restored.currentLevel).toBe(2);
   expect(restored.circuits[1]).toEqual(workspace.circuits[1]);
   expect(restored.proofs[1]).toEqual(workspace.proofs[1]);

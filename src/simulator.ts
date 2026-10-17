@@ -1,7 +1,9 @@
+// 交互仿真与判题入口。交互路径把扁平网表编译为 DigitalJS HeadlessCircuit（存储元件外置为状态源/采样器）；
+// 判题则按关卡模式分发到掩码内核（combinationalEvaluator/sequentialEvaluator）或编程运行器。
 import { HeadlessCircuit } from 'digitaljs';
 import { Vector3vl } from '3vl';
 import { getLevel, testInputs, testSequences } from './levels';
-import { getPorts, validateCircuit } from './model';
+import { getPorts, validateCircuit, validateWorkshopCircuit } from './model';
 import { flattenGraph } from './netlist';
 import { compileCombinational } from './combinationalEvaluator';
 import { compileSequential } from './sequentialEvaluator';
@@ -12,7 +14,9 @@ import type { Circuit, CircuitNode, ComponentLibrary, Inputs, RuntimeState, Sign
 export type { Signal, Simulation, TestResult, TestRow } from './contracts';
 export { hasSequential } from './netlist';
 
+/** 外置 DFF：q 是状态源（Input 器件），d/rst 是采样器（Output 器件）。 */
 interface Register { key:string; bits:number; q:Endpoint; d:Endpoint; rst:Endpoint; }
+/** 外置 ROM/RAM：ROM 的 words 固定，RAM 的 256 字保存在 RuntimeState.memories。 */
 interface Memory { key:string; bits:number; q:Endpoint; addr:Endpoint; words?:number[]; d?:Endpoint; we?:Endpoint; rst?:Endpoint; }
 
 /** Registers and memories become state sources plus collectors; DigitalJS evaluates the gates. */
@@ -20,6 +24,7 @@ function compile(circuit:Circuit,library:ComponentLibrary) {
   const flat=flattenGraph(circuit,library),devices:Record<string,Record<string,unknown>>={},connectors:{from:Endpoint;to:Endpoint}[]=[],registers:Register[]=[],memories:Memory[]=[];
   const nodeMap=new Map(flat.nodes.map(n=>[n.id,n.node]));
   function actual(endpoint:Endpoint):Endpoint[] {
+    // DigitalJS 器件端口名与我们的端口 id 不同：门用 in1/in2/out，NOT 的单输入同时接 in1/in2。
     const node=nodeMap.get(endpoint.id)!;
     if (['DFF','ROM','RAM'].includes(node.type)) return [{id:`${endpoint.id}:${endpoint.port}`,port:endpoint.port==='q'?'out':'in'}];
     if (node.type==='NOT'&&endpoint.port==='a') return [{id:endpoint.id,port:'in1'},{id:endpoint.id,port:'in2'}];
@@ -60,6 +65,7 @@ function compile(circuit:Circuit,library:ComponentLibrary) {
 }
 type Session=ReturnType<typeof compile>;
 
+/** 把 Vector3vl 转为 Signal：全 0/1 → 数值，全 X → 'X'，其余 → 原二进制串。 */
 function signal(vector?:Vector3vl):Signal {
   const bin=vector?.toBin().toUpperCase();
   if (!bin) return 'X';
@@ -74,6 +80,7 @@ function binary(value:Signal,bits:number):string {
   if (value.length!==bits||!/^[01X]+$/.test(value)) throw new Error('寄存器状态无效。');
   return value;
 }
+/** 由已有状态构造（或校验）初始 RuntimeState：RAM 默认 256 个 0，寄存器默认 0。 */
 function initial(session:Session,state?:RuntimeState):RuntimeState {
   if (state&&(!Number.isSafeInteger(state.cycle)||state.cycle<0||!state.registers||typeof state.registers!=='object')) throw new Error('时钟状态无效。');
   const memories=Object.fromEntries(session.memories.filter(m=>m.words===undefined).map(m=>{
@@ -106,6 +113,7 @@ function merge(values:Signal[],bits:number):Signal {
   }
   return signal(Vector3vl.fromBin(result.toLowerCase()));
 }
+/** 枚举与含 X 地址匹配的全部 256 个候选地址，用于存储器保守读取。 */
 function addresses(value:Signal):number[] {
   if(typeof value==='number')return [value];
   const pattern=binary(value,8);
@@ -126,6 +134,7 @@ function settleMemories(session:Session,state:RuntimeState) {
   }
   throw new Error('存储器寻址信号未能稳定。');
 }
+/** 施加输入与当前状态，并让存储器输出稳定（存储器输出经门级反馈再作地址时需迭代）。 */
 function apply(session:Session,circuit:Circuit,inputs:Inputs,state:RuntimeState) {
   for (const node of circuit.nodes.filter(n=>n.type==='INPUT')) {
     const bits=node.bits??1,v=inputs[node.id]??0;
@@ -138,6 +147,7 @@ function apply(session:Session,circuit:Circuit,inputs:Inputs,state:RuntimeState)
 function outputValue(session:Session,node:CircuitNode):Signal {
   return signal(session.engine.getOutput(session.references.get(node.id)!.device!));
 }
+/** 推进一个周期：先以旧状态求值并采样全部 d/rst/we，再同时提交新状态并重新求值；tick=false 只求值不推进。 */
 function advance(session:Session,circuit:Circuit,inputs:Inputs,state:RuntimeState,tick:boolean):RuntimeState {
   apply(session,circuit,inputs,state);
   if (!tick) return state;
@@ -152,6 +162,7 @@ function advance(session:Session,circuit:Circuit,inputs:Inputs,state:RuntimeStat
     if(rst===1)return [m.key,Array(256).fill(0)];
     let data=[...old];
     if(we!==0) {
+      // 地址或写使能含 X 时，把「写旧值」与「写新值」两种可能按位合并，得到保守结果。
       const candidates=addresses(read(session.engine,m.addr)),d=read(session.engine,m.d!);
       for(const addr of candidates)data[addr]=we===1&&candidates.length===1?d:merge([old[addr],d],8);
     }
@@ -162,6 +173,7 @@ function advance(session:Session,circuit:Circuit,inputs:Inputs,state:RuntimeStat
   apply(session,circuit,inputs,next);
   return next;
 }
+/** 采集展示用快照：每个节点的值、每个端口的值与每条导线的信号。 */
 function snapshot(session:Session,circuit:Circuit,library:ComponentLibrary,state:RuntimeState):Simulation {
   const values:Record<string,Signal>={},portValues:Record<string,Signal>={};
   for (const node of circuit.nodes) {
@@ -174,14 +186,17 @@ function snapshot(session:Session,circuit:Circuit,library:ComponentLibrary,state
     state:{cycle:state.cycle,registers:{...state.registers},...(state.memories?{memories:Object.fromEntries(Object.entries(state.memories).map(([key,words])=>[key,[...words]]))}:{})}};
 }
 function checkedSession(circuit:Circuit,library:ComponentLibrary):Session {
-  const error=validateCircuit(circuit,library)[0];if(error)throw new Error(error);
+  // 工坊草稿（levelId=0）不绑定关卡端口，走自由接口校验。
+  const error=(circuit.levelId===0?validateWorkshopCircuit(circuit,library):validateCircuit(circuit,library))[0];if(error)throw new Error(error);
   return compile(circuit,library);
 }
+/** 时序关测试程序覆盖：第 38/44 关判题时用场景自带的 ROM 替换电路中的 program 节点。 */
 function withProgram(circuit:Circuit,program?:number[]):Circuit {
   if(program===undefined||![38,44].includes(circuit.levelId))return circuit;
   return {...circuit,nodes:circuit.nodes.map(n=>n.id==='program'?{...n,words:[...program]}:n)};
 }
 
+/** 单步交互仿真：可携带旧状态、是否推进时钟、判题用测试程序。 */
 export function simulate(circuit:Circuit,inputs:Inputs,library:ComponentLibrary={},options:{state?:RuntimeState;tick?:boolean;program?:number[]}={}):Simulation {
   circuit=withProgram(circuit,options.program);
   const session=checkedSession(circuit,library);
@@ -203,6 +218,7 @@ export function createSimulationSession(circuit:Circuit,library:ComponentLibrary
   };
 }
 
+/** 回放一串步骤并保留最近 64 帧观察，用于反例重现到失败那一刻。 */
 export function replaySequence(circuit:Circuit,library:ComponentLibrary,steps:SimulationStep[],program?:number[]):Simulation {
   circuit=withProgram(circuit,program);
   const session=checkedSession(circuit,library),trace:SimulationFrame[]=[];
@@ -219,6 +235,7 @@ export function replaySequence(circuit:Circuit,library:ComponentLibrary,steps:Si
   } finally {session.engine.shutdown();}
 }
 
+/** 判题入口：编程关 → judgeProgramming；组合关 → 掩码内核穷举/公开用例；时序关 → 每场景重置的时序内核。 */
 export function judge(circuit:Circuit,library:ComponentLibrary={}):TestResult {
   if(isProgrammingLevel(circuit.levelId))return judgeProgramming(circuit,library);
   try {

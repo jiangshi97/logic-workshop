@@ -1,13 +1,17 @@
+// 判题内核：把扁平网表编译成拓扑排序的指令序列，在 known/value 两个掩码数组上执行。
+// 所有门运算都写成掩码代数，天然支持三值信号（0/1/X）；交互仿真仍走 DigitalJS，两者由等价测试保证一致。
 import type { CircuitGraph, ComponentLibrary, Inputs, Signal } from './contracts';
 import { flattenGraph } from './netlist';
 import { getPorts } from './model';
 
 type Operation = 'INPUT'|'CONST'|'BUFFER'|'NOT'|'AND'|'NAND'|'OR'|'XOR'|'XNOR'|'SPLIT'|'JOIN'|'DFF'|'ROM'|'RAM';
+/** 一条内核指令：从位槽 a/b 读操作数，结果写入位槽 output。 */
 interface Instruction {
   op:Operation; bits:number; mask:number; output:number; a:number; b:number;
   bus?:number[]; inputId?:string; constant?:number;
   storageKey?:string; words?:BitSignal[];
 }
+/** 位掩码形式的信号：known 为 1 的位有效，对应 value 中的 0/1；known 为 0 的位未知。 */
 export interface BitSignal { known:number; value:number; }
 export interface StorageDevice {
   key:string; kind:'DFF'|'RAM'; bits:number; q:number; d:number; rst:number; addr:number; we:number;
@@ -35,6 +39,7 @@ export function maskSignal({known,value}:BitSignal,bits:number):Signal {
   if(known===0)return 'X';
   let bin='';for(let i=bits-1;i>=0;i--)bin+=known&1<<i?value&1<<i?'1':'0':'X';return bin;
 }
+/** 掩码合并：只有两个输入都已知且相同的位才保持已知（用于多候选地址/复位未知的保守合并）。 */
 export function mergeMasks(a:BitSignal,b:BitSignal):BitSignal {
   const known=a.known&b.known&~(a.value^b.value);return {known,value:a.value&known};
 }
@@ -57,6 +62,7 @@ export function compileGateKernel(graph:CircuitGraph,library:ComponentLibrary={}
     if(node.type==='OUTPUT')slots.set(`${id}:out`,slotCount++);
   }
   const sources=new Map<string,number>(),outgoing=flat.nodes.map(()=>[] as number[]),indegree=new Int32Array(flat.nodes.length);
+  // 写端口（DFF 全部输入、RAM 的 d/we/rst）不参与拓扑边，因此经过存储元件的反馈不影响排序。
   for(const {from,to} of flat.wires){
     sources.set(`${to.id}:${to.port}`,slots.get(`${from.id}:${from.port}`)!);
     const a=nodeIndexes.get(from.id)!,b=nodeIndexes.get(to.id)!,target=flat.nodes[b].node.type;
@@ -103,6 +109,7 @@ export function compileGateKernel(graph:CircuitGraph,library:ComponentLibrary={}
         case 'BUFFER': k=ak&mask;v=av&k;break;
         case 'NOT': k=ak&mask;v=~av&k;break;
         case 'AND':case 'NAND':{
+          // AND 三值运算：双方均为 1 的位得 1，任一方已知为 0 的位得 0，其余未知。
           const ones=av&ak&bv&bk,zeros=(~av&ak)|(~bv&bk);k=(ones|zeros)&mask;v=op==='AND'?ones:~ones&k;break;
         }
         case 'OR':{

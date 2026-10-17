@@ -1,0 +1,13 @@
+{
+  "id": 3,
+  "title": "反向开关",
+  "caption": "把已有元件变成新工具",
+  "goal": "A 为 0 时 Y 为 1；A 为 1 时 Y 为 0。",
+  "formula": "Y = ¬A",
+  "chapter": 1,
+  "inputs": [["A", 1]],
+  "outputs": [["Y", 1]],
+  "hints": ["观察 NAND 的两个输入相同时，会输出什么。", "同一个输出端口可以连接到多个输入端口。", "将 A 同时接到 NAND 的两个输入，再连接 NAND 的输出到 Y。"],
+  "rewardName": "NOT",
+  "combinational": { "expect": { "Y": "~A" } }
+}

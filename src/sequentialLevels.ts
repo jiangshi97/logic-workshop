@@ -1,3 +1,5 @@
+// 第 21–32 关（状态与时间）：关卡定义 + 独立数学参考状态机 + 测试场景生成器。
+// 场景（scenarios）按关卡类别覆盖保持、复位优先级、同沿读写旧值、回绕等时序细节。
 import type { GateType, Inputs, Outputs, Port, SimulationStep, TestSequence } from './contracts';
 import type { Level } from './levels';
 
@@ -29,15 +31,15 @@ function mathematicalMachine(id: number) {
   };
 }
 
+/** 时序关卡工厂：expectedOutputs 仅用于兼容展示，真正判题始终走 sequences 场景。 */
 function temporalLesson(id: number, title: string, caption: string, goal: string, formula: string,
   inputSpecs: Specs, outputSpecs: Specs, hints: string[], rewardName: string): Level {
   const inputPorts = ports(inputSpecs), outputPorts = ports(outputSpecs);
   // Compatibility only: one capture from cleared state. Temporal grading always uses sequences.
   const expectedOutputs = (inputs: Inputs) => mathematicalMachine(id)(inputs, true);
-  return { id, title, caption, story: goal, goal, formula, chapter: 5, mode: 'sequential',
+  return { id, title, caption, goal, formula, chapter: 5, mode: 'sequential',
     inputs: inputPorts.map(p => p.id), inputPorts, outputPorts, allowed: [...tools], hints, rewardName,
-    expectedOutputs, expected: inputs => expectedOutputs(inputs)[outputPorts[0].id],
-    sequences: () => scenarios(id, inputPorts),
+    expectedOutputs, sequences: () => scenarios(id, inputPorts),
   };
 }
 
@@ -68,6 +70,7 @@ export const sequentialLevels: Level[] = [
     ['Memory 是当前地址对应的组合输出。', '给 Memory 后面再接一个由 Read 控制的寄存器。', '所有寄存器共享时钟与 R；同一沿读写时 Out 得到写入前的值。'], 'MemoryDatapath4'),
 ];
 
+/** 生成第 21–32 关测试场景：每类关卡一组（或多组）步骤序列，期望值由 mathematicalMachine 同步计算。 */
 function scenarios(id: number, inputPorts: Port[]): TestSequence[] {
   const result: TestSequence[] = [];
   const defaults = Object.fromEntries(inputPorts.map(p => [p.id, 0]));

@@ -1,0 +1,13 @@
+{
+  "id": 4,
+  "title": "双人确认",
+  "caption": "组合出 AND",
+  "goal": "只有 A 和 B 都为 1 时，Y 才为 1。",
+  "formula": "Y = A ∧ B",
+  "chapter": 1,
+  "inputs": [["A", 1], ["B", 1]],
+  "outputs": [["Y", 1]],
+  "hints": ["NAND 的结果和任务要求恰好相反。", "上一关得到的 NOT 可以再次反转一个信号。", "先将 A、B 接入 NAND，再通过 NOT 连接到 Y。也可以用两个 NAND 完成。"],
+  "rewardName": "AND",
+  "combinational": { "expect": { "Y": "A & B" } }
+}

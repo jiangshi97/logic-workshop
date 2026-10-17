@@ -1,3 +1,4 @@
+// 组件库管理：传递依赖闭包、软删除与清理、重命名（同步更新所有引用处）、实例替换。
 import type { Circuit, CircuitGraph, ComponentDefinition, ComponentLibrary, Port } from './contracts';
 import { validateCircuit } from './model';
 
@@ -7,6 +8,7 @@ export interface ComponentWorkspace {
   proofs: Record<number, Circuit>;
 }
 
+/** 求目标组件的传递依赖闭包（含自身）；删除组件时据此一并软删除。 */
 export function dependentComponentKeys(library: ComponentLibrary, targetKey: string): string[] {
   if (!library[targetKey]) throw new Error('组件不存在。');
   const affected = new Set([targetKey]);
@@ -23,6 +25,7 @@ export function dependentComponentKeys(library: ComponentLibrary, targetKey: str
   return [...affected];
 }
 
+/** 软删除：定义保留在库中保护历史引用，电路中的残留实例标红、只能移除或替换。 */
 export function markComponentsDeleted(library: ComponentLibrary, keys: Iterable<string>): ComponentLibrary {
   const deleted = new Set(keys);
   return Object.fromEntries(Object.entries(library).map(([key, definition]) =>
@@ -37,6 +40,7 @@ export function componentInterfacesMatch(left: ComponentDefinition, right: Compo
   return samePorts(left.inputs, right.inputs) && samePorts(left.outputs, right.outputs);
 }
 
+/** 替换实例：要求两个组件版本的接口端口（id 与位宽序列）完全一致，位置与连线保持不变。 */
 export function replaceComponentInstance(circuit: Circuit, nodeId: string, targetKey: string, library: ComponentLibrary): Circuit {
   const node = circuit.nodes.find(item => item.id === nodeId);
   if (!node || node.type !== 'COMPONENT') throw new Error('请选择一个组件实例。');
@@ -58,6 +62,7 @@ export function renameComponentInstances<T extends CircuitGraph>(graph: T, compo
     ? { ...node, label: name } : node) } as T;
 }
 
+/** 重命名组件：同步更新组件库、所有关卡电路、证明与撤销历史中的实例标签。 */
 export function renameComponent<T extends ComponentWorkspace>(workspace: T, componentKey: string, rawName: string): T {
   const name = rawName.trim();
   if (!name || name.length > 60) throw new Error('组件名称需要 1 至 60 个字符。');
@@ -73,6 +78,7 @@ export function renameComponent<T extends ComponentWorkspace>(workspace: T, comp
   return { ...workspace, library, circuits: records(workspace.circuits), proofs: records(workspace.proofs) };
 }
 
+/** 图中（含嵌套依赖）是否引用了已删除组件：此类电路禁止判题/复制/封装，需先移除或替换。 */
 export function graphUsesDeletedComponent(graph: CircuitGraph, library: ComponentLibrary): boolean {
   const visited = new Set<string>();
   const usesDeleted = (key: string): boolean => {

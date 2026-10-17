@@ -1,0 +1,13 @@
+{
+  "id": 19,
+  "title": "四位自增",
+  "caption": "复用加法器",
+  "goal": "将 A 加 1，Y 保留四位，Cout 表示从 15 回到 0 时的进位。",
+  "formula": "Y + 16Cout = A + 1",
+  "chapter": 4,
+  "inputs": [["A", 4]],
+  "outputs": [["Y", 4], ["Cout", 1]],
+  "hints": ["自增可以看成一次固定加法。", "CONST 提供固定的 0 或 1，四位常量 1 仅最低位为 1。", "给四位加法器输入 A、常量 1 和 Cin=0。"],
+  "rewardName": "Increment4",
+  "combinational": { "expect": { "Y": "(A + 1) mod 16", "Cout": "A = 15" } }
+}

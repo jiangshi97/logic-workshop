@@ -1,9 +1,12 @@
+// 机器观察面板（第 33–44 关编程/架构阶段）：展示真实电路信号 PC/IR/Phase/寄存器等；
+// ProgramEditor 是第 38/44 关 ROM 的十六进制指令字编辑器（分页浏览、当前指令高亮）。
 import { useState } from 'react';
 import { Cpu, FileCode2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CircuitNode, Simulation } from './contracts';
 import { decodeInstruction } from './architectureSpec';
 import { parseProgramText, formatProgramText } from './programEditor';
 
+/** 指令字的紧凑展示（如 "MOVI A, 5"），非法编码显示提示。 */
 export function instructionLabel(word: number): string {
   const instruction = decodeInstruction(word);
   if (!instruction.valid) return '非法编码';

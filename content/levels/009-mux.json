@@ -1,0 +1,13 @@
+{
+  "id": 9,
+  "title": "信号选择器",
+  "caption": "一位 MUX",
+  "goal": "S 为 0 时 Y=A；S 为 1 时 Y=B。",
+  "formula": "Y = (A ∧ ¬S) ∨ (B ∧ S)",
+  "chapter": 2,
+  "inputs": [["A", 1], ["B", 1], ["S", 1]],
+  "outputs": [["Y", 1]],
+  "hints": ["S 控制 B 通路，反向的 S 控制 A 通路。", "两条通路分别经过 AND，再通过 OR 合并。", "NOT(S) 与 A 接 AND；S 与 B 接 AND；两个结果接 OR。"],
+  "rewardName": "MUX",
+  "combinational": { "expect": { "Y": "S = 0 ? A : B" } }
+}
