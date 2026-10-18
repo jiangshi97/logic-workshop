@@ -1,0 +1,49 @@
+{
+  "id": 27,
+  "title": "可逆计数器",
+  "caption": "向前与向后",
+  "goal": "使能时 Down=0 加 1，Down=1 减 1；0 减 1 得 15。沿上 R 优先清零。",
+  "formula": "沿上 Q ← R ? 0 : E ? (Q ± 1) mod 16 : Q",
+  "chapter": 5,
+  "inputs": [
+    [
+      "E",
+      1
+    ],
+    [
+      "Down",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      4
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "分别计算当前 Q 的加一与减一。",
+    "Down 选择方向，E 决定是否保存新值。",
+    "先选择加减结果，再用 E 选择保持或写入；R 接同步复位。"
+  ],
+  "rewardName": "UpDownCounter4",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

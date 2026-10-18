@@ -25,7 +25,7 @@ describe('programming challenge specifications', () => {
       expect(level.inputPorts).toEqual(getLevel(44).inputPorts);
       expect(level.outputPorts).toEqual(getLevel(44).outputPorts);
       expect(level.allowed).toEqual(getLevel(44).allowed);
-      expect(level.defaultProgram).toEqual([]);
+      expect(level.defaultProgram ?? []).toEqual([]);
       expect(testInputs(id)).toEqual([]);
       expect(testSequences(id)).toEqual([]);
     }

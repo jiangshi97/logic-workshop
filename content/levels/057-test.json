@@ -1,0 +1,17 @@
+{
+  "id": 57,
+  "title": "测试关卡",
+  "caption": "测试",
+  "goal": "Have fun",
+  "formula": "Diff = 0, Borrow = A + B",
+  "chapter": 7,
+  "inputs": [["A", 4], ["B", 4]],
+  "outputs": [["Diff", 4], ["Borrow", 4]],
+  "hints": [
+    "哈哈哈",
+    "嘻嘻嘻",
+    "看到这里还不退？"
+  ],
+  "rewardName": "测试",
+  "combinational": { "expect": { "Diff": "0", "Borrow": "A + B" } }
+}

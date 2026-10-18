@@ -1,0 +1,38 @@
+{
+  "id": 56,
+  "title": "两数相乘",
+  "caption": "从硬件走到完整算法",
+  "goal": "输出 RAM[240]×RAM[241] 的模 256 结果，然后正常停止。",
+  "formula": "OUT = ab mod 256",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["乘法是多次累加，每次累加还可用加一循环实现。","为外层次数、内层次数和累计结果分配不同 RAM 单元。","零乘数应直接结束；模256回绕也是正确结果的一部分。"],
+  "program": {
+      "cases": [
+        {"id":"program-56-1","label":"RAM[240]=0，RAM[241]=0","memory":{"240":0,"241":0},"expectedOutput":[0],"maxCycles":220},
+        {"id":"program-56-2","label":"RAM[240]=1，RAM[241]=1","memory":{"240":1,"241":1},"expectedOutput":[1],"maxCycles":340},
+        {"id":"program-56-3","label":"RAM[240]=2，RAM[241]=2","memory":{"240":2,"241":2},"expectedOutput":[4],"maxCycles":540},
+        {"id":"program-56-4","label":"RAM[240]=3，RAM[241]=3","memory":{"240":3,"241":3},"expectedOutput":[9],"maxCycles":820},
+        {"id":"program-56-5","label":"RAM[240]=4，RAM[241]=4","memory":{"240":4,"241":4},"expectedOutput":[16],"maxCycles":1180},
+        {"id":"program-56-6","label":"RAM[240]=5，RAM[241]=5","memory":{"240":5,"241":5},"expectedOutput":[25],"maxCycles":1620},
+        {"id":"program-56-7","label":"RAM[240]=6，RAM[241]=6","memory":{"240":6,"241":6},"expectedOutput":[36],"maxCycles":2140},
+        {"id":"program-56-8","label":"RAM[240]=7，RAM[241]=7","memory":{"240":7,"241":7},"expectedOutput":[49],"maxCycles":2740},
+        {"id":"program-56-9","label":"RAM[240]=8，RAM[241]=8","memory":{"240":8,"241":8},"expectedOutput":[64],"maxCycles":3420},
+        {"id":"program-56-10","label":"RAM[240]=0，RAM[241]=255","memory":{"240":0,"241":255},"expectedOutput":[0],"maxCycles":10420},
+        {"id":"program-56-11","label":"RAM[240]=255，RAM[241]=0","memory":{"240":255,"241":0},"expectedOutput":[0],"maxCycles":10420},
+        {"id":"program-56-12","label":"RAM[240]=1，RAM[241]=255","memory":{"240":1,"241":255},"expectedOutput":[255],"maxCycles":20660},
+        {"id":"program-56-13","label":"RAM[240]=255，RAM[241]=1","memory":{"240":255,"241":1},"expectedOutput":[255],"maxCycles":20660},
+        {"id":"program-56-14","label":"RAM[240]=2，RAM[241]=3","memory":{"240":2,"241":3},"expectedOutput":[6],"maxCycles":660},
+        {"id":"program-56-15","label":"RAM[240]=3，RAM[241]=2","memory":{"240":3,"241":2},"expectedOutput":[6],"maxCycles":660},
+        {"id":"program-56-16","label":"RAM[240]=4，RAM[241]=7","memory":{"240":4,"241":7},"expectedOutput":[28],"maxCycles":1780},
+        {"id":"program-56-17","label":"RAM[240]=7，RAM[241]=4","memory":{"240":7,"241":4},"expectedOutput":[28],"maxCycles":1780},
+        {"id":"program-56-18","label":"RAM[240]=8，RAM[241]=3","memory":{"240":8,"241":3},"expectedOutput":[24],"maxCycles":1620},
+        {"id":"program-56-19","label":"RAM[240]=3，RAM[241]=8","memory":{"240":3,"241":8},"expectedOutput":[24],"maxCycles":1620},
+        {"id":"program-56-20","label":"RAM[240]=16，RAM[241]=16","memory":{"240":16,"241":16},"expectedOutput":[0],"maxCycles":11740},
+        {"id":"program-56-21","label":"RAM[240]=20，RAM[241]=20","memory":{"240":20,"241":20},"expectedOutput":[144],"maxCycles":17820}
+      ],
+      "referenceSource": "; 每轮把乘数累加一次，内层用加一实现动态加法\nLOAD 240\nSTORE 244\nMOVI A, 0\nSTORE 245\nMOVI B, 1\nouter: LOAD 244\nJZ done\nSUB\nSTORE 244\nLOAD 241\nSTORE 246\ninner: LOAD 246\nJZ outer\nSUB\nSTORE 246\nLOAD 245\nADD\nSTORE 245\nJMP inner\ndone: LOAD 245\nOUT\nHLT"
+  }
+}

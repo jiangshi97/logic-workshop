@@ -9,7 +9,7 @@ import { pruneDeletedComponents } from './componentManagement';
 import type { Circuit, CircuitGraph, CircuitNode, ComponentDefinition, ComponentLibrary, Inputs, NodeType, Port, Wire } from './contracts';
 
 export const STORAGE_KEY = 'logic-workshop.v1';
-/** 存档结构（version 6）：56 关草稿、通关证明、每关输入值、完整组件库与可选的元件工坊草稿（levelId=0）。 */
+/** 存档结构（version 6）：全部关卡草稿、通关证明、每关输入值、完整组件库与可选的元件工坊草稿（levelId=0）。 */
 export interface Workspace {
   version: 6;
   currentLevel: number;
@@ -22,8 +22,8 @@ export interface Workspace {
 
 export function createWorkspace(): Workspace {
   return { version: 6, currentLevel: 1, proofs: {}, library: programmingMachineLibrary(),
-    circuits: Object.fromEntries(levels.map(level => [level.id, level.id >= 45 ? programmingMachine(level.id) : createCircuit(level.id)])),
-    inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, level.id >= 45 && name === 'E' ? 1 : 0]))])) };
+    circuits: Object.fromEntries(levels.map(level => [level.id, level.mode === 'program' ? programmingMachine(level.id) : createCircuit(level.id)])),
+    inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, level.mode === 'program' && name === 'E' ? 1 : 0]))])) };
 }
 
 const nodeTypes: NodeType[] = ['INPUT', 'OUTPUT', 'NAND', 'NOT', 'AND', 'OR', 'XOR', 'XNOR', 'CONST', 'SPLIT', 'JOIN', 'DFF', 'ROM', 'RAM', 'COMPONENT'];
@@ -171,16 +171,19 @@ export function parseWorkspace(text: string, options: { verifyProofs?: boolean }
   // New fixed drafts require canonical CPU dependencies. Preserve every saved version,
   // including same-key definitions; fixed-machine validation diagnoses conflicts.
   workspace.library = parseLibrary((raw.version as number) >= 5 ? savedLibrary : { ...programmingMachineLibrary(), ...savedLibrary });
-  const maximumSavedLevel = raw.version === 1 ? 4 : raw.version === 2 ? 20 : raw.version === 3 ? 32 : raw.version === 4 ? 44 : 56;
+  const maximumSavedLevel = raw.version === 1 ? 4 : raw.version === 2 ? 20 : raw.version === 3 ? 32 : raw.version === 4 ? 44 : levels.at(-1)!.id;
+  // v1–v4 老档沿用历史严格上限；v5 起关卡目录会随 JSON 追加/删改变化，目录外的关卡键
+  // （实验关卡编号或更新版本写出的存档）只是不再被读取，不能因此让整个存档失效。
+  const strictLevelCap = (raw.version as number) <= 4;
   const checkLevelKeys = (value: Record<string, unknown>) => {
-    if (Object.keys(value).some(key => !/^[1-9][0-9]*$/.test(key) || Number(key) > maximumSavedLevel)) {
+    if (Object.keys(value).some(key => !/^[1-9][0-9]*$/.test(key) || (strictLevelCap && Number(key) > maximumSavedLevel))) {
       throw new Error('存档包含无效关卡编号。');
     }
   };
   checkLevelKeys(circuits); checkLevelKeys(proofs); checkLevelKeys(inputs);
   for (const level of levels) {
     if (level.id <= maximumSavedLevel) workspace.circuits[level.id] = parseCircuit(circuits[level.id], level.id, workspace.library);
-    else if (level.id >= 45) {
+    else if (level.mode === 'program') {
       const errors = validateCircuit(workspace.circuits[level.id], workspace.library);
       if (errors.length) throw new Error(errors[0]);
     }

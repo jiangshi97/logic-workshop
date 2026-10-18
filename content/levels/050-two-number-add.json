@@ -1,0 +1,29 @@
+{
+  "id": 50,
+  "title": "两数相加",
+  "caption": "从内存读取动态输入",
+  "goal": "输出 RAM[240]+RAM[241] 的模 256 结果，然后停止。",
+  "formula": "OUT = (a + b) mod 256",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["LOAD 只能写 A，MOVI B 只能写立即数。","可在 RAM[244] 及更高地址保存计数与累计结果。","用循环把第二个加数次数的 1 加到第一个加数上。"],
+  "program": {
+      "cases": [
+        {"id":"program-50-1","label":"RAM[240]=0，RAM[241]=0","memory":{"240":0,"241":0},"expectedOutput":[0],"maxCycles":125},
+        {"id":"program-50-2","label":"RAM[240]=0，RAM[241]=255","memory":{"240":0,"241":255},"expectedOutput":[255],"maxCycles":9050},
+        {"id":"program-50-3","label":"RAM[240]=255，RAM[241]=0","memory":{"240":255,"241":0},"expectedOutput":[255],"maxCycles":9050},
+        {"id":"program-50-4","label":"RAM[240]=1，RAM[241]=1","memory":{"240":1,"241":1},"expectedOutput":[2],"maxCycles":160},
+        {"id":"program-50-5","label":"RAM[240]=255，RAM[241]=1","memory":{"240":255,"241":1},"expectedOutput":[0],"maxCycles":9050},
+        {"id":"program-50-6","label":"RAM[240]=1，RAM[241]=255","memory":{"240":1,"241":255},"expectedOutput":[0],"maxCycles":9050},
+        {"id":"program-50-7","label":"RAM[240]=128，RAM[241]=128","memory":{"240":128,"241":128},"expectedOutput":[0],"maxCycles":4605},
+        {"id":"program-50-8","label":"RAM[240]=127，RAM[241]=128","memory":{"240":127,"241":128},"expectedOutput":[255],"maxCycles":4605},
+        {"id":"program-50-9","label":"RAM[240]=254，RAM[241]=2","memory":{"240":254,"241":2},"expectedOutput":[0],"maxCycles":9015},
+        {"id":"program-50-10","label":"RAM[240]=85，RAM[241]=86","memory":{"240":85,"241":86},"expectedOutput":[171],"maxCycles":3135},
+        {"id":"program-50-11","label":"RAM[240]=13，RAM[241]=42","memory":{"240":13,"241":42},"expectedOutput":[55],"maxCycles":1595},
+        {"id":"program-50-12","label":"RAM[240]=42，RAM[241]=13","memory":{"240":42,"241":13},"expectedOutput":[55],"maxCycles":1595}
+      ],
+      "referenceSource": "; 244 保存第二个加数，245 保存累计结果\nLOAD 240\nSTORE 245\nLOAD 241\nSTORE 244\nMOVI B, 1\nloop: LOAD 244\nJZ done\nSUB\nSTORE 244\nLOAD 245\nADD\nSTORE 245\nJMP loop\ndone: LOAD 245\nOUT\nHLT"
+  }
+}

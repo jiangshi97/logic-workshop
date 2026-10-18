@@ -1,0 +1,49 @@
+{
+  "id": 23,
+  "title": "使能寄存器",
+  "caption": "选择写入或保持",
+  "goal": "沿上 R=1 清零；否则 E=1 时写入 D，E=0 时保持。",
+  "formula": "沿上 Q ← R ? 0 : E ? D : Q",
+  "chapter": 5,
+  "inputs": [
+    [
+      "D",
+      1
+    ],
+    [
+      "E",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "保持意味着把当前 q 再送回 d。",
+    "用 E 在当前 q 与新数据 D 之间选择。",
+    "MUX(Q,D,E) 接 d，R 接 rst；复位优先于使能。"
+  ],
+  "rewardName": "EnabledRegister1",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

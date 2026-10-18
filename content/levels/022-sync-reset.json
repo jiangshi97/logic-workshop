@@ -1,0 +1,45 @@
+{
+  "id": 22,
+  "title": "同步复位",
+  "caption": "用时钟清除状态",
+  "goal": "沿上 R=1 时 Q 清零，否则 Q=D。改变 R 也要等到时钟沿才生效。",
+  "formula": "沿上 Q ← R ? 0 : D",
+  "chapter": 5,
+  "inputs": [
+    [
+      "D",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "复位也遵守同一个时钟。",
+    "R 的优先级高于数据输入。",
+    "D 接 DFF.d，R 接 rst，q 接 Q；先写入 1 再测试复位。"
+  ],
+  "rewardName": "ResetRegister1",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

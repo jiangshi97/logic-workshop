@@ -1,0 +1,45 @@
+{
+  "id": 25,
+  "title": "翻转开关",
+  "caption": "状态参与运算",
+  "goal": "沿上 R=1 清零；否则 T=1 翻转 Q，T=0 保持。",
+  "formula": "沿上 Q ← R ? 0 : Q ⊕ T",
+  "chapter": 5,
+  "inputs": [
+    [
+      "T",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "XOR 与 0 运算保持，与 1 运算反转。",
+    "DFF 的 q 可以参加计算下一状态。",
+    "XOR(q,T) 接 d，R 接 rst。"
+  ],
+  "rewardName": "Toggle1",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

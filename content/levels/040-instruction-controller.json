@@ -1,0 +1,95 @@
+{
+  "id": 40,
+  "title": "指令控制器",
+  "caption": "把指令变成控制信号",
+  "goal": "根据当前指令 Instruction、零标志 Z 和阶段 Phase 生成控制信号。Phase=0、1、2 分别表示取指、译码、执行，合法指令只有在 Phase=2 时产生对应控制信号。WA/WB 分别是寄存器 A/B 写使能；ALUOp 选择 ALU 运算（00 加法、01 减法）；MemWrite/MemRead 分别是 RAM 写入和读取使能；Jump 是 PC 跳转使能；OutWrite 是输出寄存器写使能；Halt 是停机信号；Invalid 表示指令编码非法且不受 Phase 影响。JZ 还需要 Z=1。",
+  "formula": "执行控制=Valid∧(Phase=2)∧指令译码",
+  "chapter": 6,
+  "inputs": [
+    [
+      "Instruction",
+      16
+    ],
+    [
+      "Z",
+      1
+    ],
+    [
+      "Phase",
+      2
+    ]
+  ],
+  "outputs": [
+    [
+      "WA",
+      1
+    ],
+    [
+      "WB",
+      1
+    ],
+    [
+      "ALUOp",
+      2
+    ],
+    [
+      "MemWrite",
+      1
+    ],
+    [
+      "MemRead",
+      1
+    ],
+    [
+      "Jump",
+      1
+    ],
+    [
+      "OutWrite",
+      1
+    ],
+    [
+      "Halt",
+      1
+    ],
+    [
+      "Invalid",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF",
+    "ROM"
+  ],
+  "hints": [
+    "先复用指令格式校验，再检测执行阶段。",
+    "合法指令在 Phase=2 时才打开对应控制信号：MOVI 根据 Param 决定写 A 或 B；ADD/SUB/LOAD 都会写 A；LOAD/STORE 分别控制 RAM 读取和写入；OUT/HLT 控制输出和停机。",
+    "ALUOp 只有 SUB 时为01；JMP 总是跳转，JZ 还要与 Z 相与；其他阶段的执行控制都应为0。"
+  ],
+  "rewardName": "InstructionController",
+  "combinational": {
+    "expect": {
+      "WA": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0 = 1) & (Phase = 2) & ((((Instruction div 4096) = 1) & (((Instruction div 256) mod 16) = 0)) | ((Instruction div 4096) = 2) | ((Instruction div 4096) = 3) | ((Instruction div 4096) = 4))",
+      "WB": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0 = 1) & (Phase = 2) & (((Instruction div 4096) = 1) & (((Instruction div 256) mod 16) = 1))",
+      "ALUOp": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0 = 1) & (Phase = 2) & ((Instruction div 4096) = 3)",
+      "MemWrite": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0 = 1) & (Phase = 2) & ((Instruction div 4096) = 5)",
+      "MemRead": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0 = 1) & (Phase = 2) & ((Instruction div 4096) = 4)",
+      "Jump": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0 = 1) & (Phase = 2) & (((Instruction div 4096) = 6) | (((Instruction div 4096) = 7) & (Z = 1)))",
+      "OutWrite": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0 = 1) & (Phase = 2) & ((Instruction div 4096) = 8)",
+      "Halt": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0 = 1) & (Phase = 2) & ((Instruction div 4096) = 9)",
+      "Invalid": "((Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0) = 0 ? 1 : 0"
+    },
+    "cases": {
+      "generator": "controller-cases"
+    }
+  }
+}

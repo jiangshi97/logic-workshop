@@ -1,0 +1,53 @@
+{
+  "id": 36,
+  "title": "程序计数器",
+  "caption": "顺序前进与跳转",
+  "goal": "沿上 R 清零；否则 E=1 时 Jump 选择 Target 或 PC+1；E=0 保持，255 加一回到 0。",
+  "formula": "沿上 PC←R?0:E?(Jump?Target:PC+1):PC",
+  "chapter": 6,
+  "inputs": [
+    [
+      "E",
+      1
+    ],
+    [
+      "Jump",
+      1
+    ],
+    [
+      "Target",
+      8
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "PC",
+      8
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "先计算旧 PC 加一。",
+    "Jump 选择顺序地址或 Target，E 再选择新地址或保持。",
+    "八位寄存器保存 PC；同步复位优先于使能与跳转。"
+  ],
+  "rewardName": "ProgramCounter8",
+  "sequential": {
+    "generator": "architecture"
+  }
+}

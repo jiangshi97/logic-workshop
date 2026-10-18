@@ -1,0 +1,55 @@
+{
+  "id": 41,
+  "title": "字节存储器",
+  "caption": "扩展到完整地址空间",
+  "goal": "Addr 选择 256 格字节。Q 组合读取当前地址；W 沿上写入 D；R 沿上清空全部 RAM，优先于写入。",
+  "formula": "Q=M[Addr]；沿上 M[Addr]←D（W=1）；R 清空",
+  "chapter": 6,
+  "inputs": [
+    [
+      "Addr",
+      8
+    ],
+    [
+      "D",
+      8
+    ],
+    [
+      "W",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      8
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF",
+    "ROM",
+    "RAM"
+  ],
+  "hints": [
+    "RAM 的 addr、d、we、rst 分别接 Addr、D、W、R。",
+    "改变 Addr 后可以立即读另一格，写入仍等待时钟沿。",
+    "确认高地址与低地址相互独立；同步复位清空所有格。"
+  ],
+  "rewardName": "Memory256x8",
+  "sequential": {
+    "generator": "architecture"
+  }
+}

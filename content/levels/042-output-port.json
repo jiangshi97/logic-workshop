@@ -1,0 +1,51 @@
+{
+  "id": 42,
+  "title": "输出端口",
+  "caption": "让程序的结果留下来",
+  "goal": "Write=1 的沿把 D 保存到 Out；其余时候保持；R 沿上优先清零。",
+  "formula": "沿上 Out←R?0:Write?D:Out",
+  "chapter": 6,
+  "inputs": [
+    [
+      "D",
+      8
+    ],
+    [
+      "Write",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Out",
+      8
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF",
+    "ROM",
+    "RAM"
+  ],
+  "hints": [
+    "输出端口也是一个八位使能寄存器。",
+    "Write 控制新数据与旧 Out 的选择。",
+    "把 R 接同步复位；输入 D 改变时不能直接改变 Out。"
+  ],
+  "rewardName": "OutputPort8",
+  "sequential": {
+    "generator": "architecture"
+  }
+}

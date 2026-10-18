@@ -1,0 +1,99 @@
+{
+  "id": 43,
+  "title": "指令数据通路",
+  "caption": "寄存器与控制器一起执行",
+  "goal": "Exec 沿上执行当前指令，Data 提供 LOAD 数据。MOVI A/ADD/SUB/LOAD 更新 Z；HLT 或非法指令锁定状态到复位。跳转与访存信号组合输出，Target/Addr 始终是 Imm，Store 始终是 A。",
+  "formula": "沿上A←WA?(MOVI→Imm;ADD/SUB→ALU(A,B,ALUOp);LOAD→Data):A;\nB←WB?Imm:B;\nZ←WA?（写入A的值=0）:Z;\nOut←OutWrite?A:Out;\n满足Exec∧(HLT∨Invalid)后Halt=1，直到R清零;\n满足Exec∧Invalid后Fault=1，直到R清零;\nTarget=Addr=Imm;Store=A",
+  "chapter": 6,
+  "inputs": [
+    [
+      "Instruction",
+      16
+    ],
+    [
+      "Data",
+      8
+    ],
+    [
+      "Exec",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "A",
+      8
+    ],
+    [
+      "B",
+      8
+    ],
+    [
+      "Z",
+      1
+    ],
+    [
+      "Out",
+      8
+    ],
+    [
+      "Halt",
+      1
+    ],
+    [
+      "Fault",
+      1
+    ],
+    [
+      "Jump",
+      1
+    ],
+    [
+      "Target",
+      8
+    ],
+    [
+      "Addr",
+      8
+    ],
+    [
+      "Store",
+      8
+    ],
+    [
+      "MemWrite",
+      1
+    ],
+    [
+      "MemRead",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF",
+    "ROM",
+    "RAM"
+  ],
+  "hints": [
+    "组合控制用 Exec∧¬Halt 门控；HLT 与非法编码用寄存器记住停止状态。",
+    "Z 是寄存器：只随写 A 更新，初始为0；OUT 保存旧 A。",
+    "Target/Addr 从指令低八位直接输出，Store 直接接 A；R 优先清除 A/B/Z/Out/Halt/Fault。"
+  ],
+  "rewardName": "InstructionDatapath",
+  "sequential": {
+    "generator": "architecture"
+  }
+}

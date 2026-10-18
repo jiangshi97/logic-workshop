@@ -112,7 +112,7 @@ test('case initialization, RAM writes, output history and source survive save wh
   await expect(page.getByTestId('ram-242')).toHaveText('255');
   await instruction(page, 9); await expect(page.getByTestId('program-output-events')).toHaveText('255');
   const saved = await exported(page);
-  expect(saved.version).toBe(6); expect(Object.keys(saved.circuits)).toHaveLength(56);
+  expect(saved.version).toBe(6); expect(Object.keys(saved.circuits)).toHaveLength(57);
   expect(saved.library['architecture-datapath@1']).toBeDefined();
   expect(saved).not.toHaveProperty('program'); expect(saved).not.toHaveProperty('runtime'); expect(saved).not.toHaveProperty('breakpoints');
   await page.locator('input[type=file]').setInputFiles({ name: 'roundtrip.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)) });
@@ -170,9 +170,13 @@ test('all twelve applications judge actual reference programs and unlock through
     await expect(page.getByTestId('test-feedback')).toContainText('全部通过', { timeout: 60_000 });
     if (id < 56) await page.getByRole('button', { name: '下一关', exact: true }).click();
   }
-  await expect(page.getByTestId('progress-count')).toHaveText('56 / 56');
-  await expect(page.getByTestId('test-feedback')).toContainText('编程应用阶段完成');
+  await expect(page.getByTestId('test-feedback')).toContainText('下一关已解锁');
+  await expect(page.getByTestId('progress-count')).toHaveText('56 / 57');
   await page.screenshot({ path: 'work/programming-complete-desktop.png' });
+  // 第 57 关是 JSON 追加的组合关（Diff/Borrow 表达式）：完成 56 关即达成编程阶段，57 处于未通关状态。
+  await page.getByRole('button', { name: '下一关', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '测试关卡', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'work/level-57.png' });
 });
 
 test('long programming tasks keep animation and pause responsive, including the mobile workbench', async ({ page }) => {

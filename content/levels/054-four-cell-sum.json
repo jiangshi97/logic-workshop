@@ -1,0 +1,27 @@
+{
+  "id": 54,
+  "title": "四格求和",
+  "caption": "重复使用同一个算法",
+  "goal": "输出 RAM[240]、RAM[241]、RAM[242]、RAM[243] 四个字节之和的模 256 结果。",
+  "formula": "OUT = (M[240]+M[241]+M[242]+M[243]) mod 256",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["直接寻址意味着 LOAD 的地址写在程序中。","为四个地址分别重复一次累计过程。","四组输入独立变化，不能遗漏任何单元；最后只输出一次。"],
+  "program": {
+      "cases": [
+        {"id":"program-54-1","label":"RAM[240]=0，RAM[241]=0，RAM[242]=0，RAM[243]=0","memory":{"240":0,"241":0,"242":0,"243":0},"expectedOutput":[0],"maxCycles":212},
+        {"id":"program-54-2","label":"RAM[240]=1，RAM[241]=2，RAM[242]=3，RAM[243]=4","memory":{"240":1,"241":2,"242":3,"243":4},"expectedOutput":[10],"maxCycles":532},
+        {"id":"program-54-3","label":"RAM[240]=255，RAM[241]=1，RAM[242]=255，RAM[243]=1","memory":{"240":255,"241":1,"242":255,"243":1},"expectedOutput":[0],"maxCycles":16596},
+        {"id":"program-54-4","label":"RAM[240]=255，RAM[241]=255，RAM[242]=255，RAM[243]=255","memory":{"240":255,"241":255,"242":255,"243":255},"expectedOutput":[252],"maxCycles":32852},
+        {"id":"program-54-5","label":"RAM[240]=0，RAM[241]=0，RAM[242]=0，RAM[243]=255","memory":{"240":0,"241":0,"242":0,"243":255},"expectedOutput":[255],"maxCycles":8372},
+        {"id":"program-54-6","label":"RAM[240]=128，RAM[241]=0，RAM[242]=128，RAM[243]=0","memory":{"240":128,"241":0,"242":128,"243":0},"expectedOutput":[0],"maxCycles":8404},
+        {"id":"program-54-7","label":"RAM[240]=13，RAM[241]=42，RAM[242]=7，RAM[243]=86","memory":{"240":13,"241":42,"242":7,"243":86},"expectedOutput":[148],"maxCycles":4948},
+        {"id":"program-54-8","label":"RAM[240]=1，RAM[241]=0，RAM[242]=0，RAM[243]=0","memory":{"240":1,"241":0,"242":0,"243":0},"expectedOutput":[1],"maxCycles":244},
+        {"id":"program-54-9","label":"RAM[240]=0，RAM[241]=1，RAM[242]=0，RAM[243]=0","memory":{"240":0,"241":1,"242":0,"243":0},"expectedOutput":[1],"maxCycles":244},
+        {"id":"program-54-10","label":"RAM[240]=0，RAM[241]=0，RAM[242]=1，RAM[243]=0","memory":{"240":0,"241":0,"242":1,"243":0},"expectedOutput":[1],"maxCycles":244}
+      ],
+      "referenceSource": "MOVI A, 0\nSTORE 245\nMOVI B, 1\nLOAD 240\nSTORE 244\nloop0: LOAD 244\nJZ next0\nSUB\nSTORE 244\nLOAD 245\nADD\nSTORE 245\nJMP loop0\nnext0: NOP\nLOAD 241\nSTORE 244\nloop1: LOAD 244\nJZ next1\nSUB\nSTORE 244\nLOAD 245\nADD\nSTORE 245\nJMP loop1\nnext1: NOP\nLOAD 242\nSTORE 244\nloop2: LOAD 244\nJZ next2\nSUB\nSTORE 244\nLOAD 245\nADD\nSTORE 245\nJMP loop2\nnext2: NOP\nLOAD 243\nSTORE 244\nloop3: LOAD 244\nJZ next3\nSUB\nSTORE 244\nLOAD 245\nADD\nSTORE 245\nJMP loop3\nnext3: NOP\nLOAD 245\nOUT\nHLT"
+  }
+}

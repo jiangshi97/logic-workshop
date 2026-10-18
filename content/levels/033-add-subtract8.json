@@ -1,0 +1,69 @@
+{
+  "id": 33,
+  "title": "八位加减器",
+  "caption": "把补码扩展为字节运算",
+  "goal": "Sub=0 加法，Sub=1 减法。Y 保留低八位；加法只输出 Carry，减法只输出 Borrow，Z 检测零。",
+  "formula": "Y=(A±B) mod 256；Z=(Y=0)",
+  "chapter": 6,
+  "inputs": [
+    [
+      "A",
+      8
+    ],
+    [
+      "B",
+      8
+    ],
+    [
+      "Sub",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Y",
+      8
+    ],
+    [
+      "Carry",
+      1
+    ],
+    [
+      "Borrow",
+      1
+    ],
+    [
+      "Z",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "Sub 同时控制 B 的逐位反转与初始进位。",
+    "减法 Borrow 是最高进位的反转，加法 Carry 是最高进位。",
+    "用 Sub 把 Carry 与 Borrow 分别门控；将 Y 的各位 OR 后反转得到 Z。"
+  ],
+  "rewardName": "AddSubtract8",
+  "combinational": {
+    "expect": {
+      "Y": "Sub = 0 ? (A + B) mod 256 : (A - B) mod 256",
+      "Carry": "Sub = 0 ? (A + B > 255 ? 1 : 0) : 0",
+      "Borrow": "Sub = 1 ? (A < B ? 1 : 0) : 0",
+      "Z": "Sub = 0 ? ((A + B) mod 256 = 0 ? 1 : 0) : ((A - B) mod 256 = 0 ? 1 : 0)"
+    },
+    "cases": {
+      "generator": "alu-cases"
+    }
+  }
+}

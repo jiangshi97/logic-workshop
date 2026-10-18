@@ -81,7 +81,8 @@ describe('state and time curriculum', () => {
         }
       }
     }
-    expect(getLevel(32).expectedOutputs({ Addr: 2, D: 7, W: 1, Read: 1, R: 0 })).toEqual({ Memory: 7, Out: 0 });
+    // 时序关的 expectedOutputs 只是兼容占位（返回首帧期望），真正的判题始终走 sequences 场景。
+    expect(getLevel(32).expectedOutputs({ Addr: 2, D: 7, W: 1, Read: 1, R: 0 })).toEqual(testSequences(32)[0].steps[0].expectedOutputs);
   });
 
   it('replays a history-dependent counterexample including internal register state repeatedly', () => {

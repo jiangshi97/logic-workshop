@@ -3,9 +3,15 @@
 import { architectureLibrary, architectureReferenceCircuit } from './architectureCircuits';
 import { assemble } from './assembler';
 import { programmingReferenceSource } from './programmingSpec';
+import { levels } from './levels';
 import type { Circuit, CircuitGraph, ComponentLibrary } from './contracts';
 
-export const isProgrammingLevel=(id:number)=>Number.isInteger(id)&&id>=45&&id<=56;
+// 编程关卡带从聚合目录中 mode='program' 的关卡派生（当前 45–56）：JSON 追加的普通关不会落入编程判题路径。
+const programmingBand = levels.reduce(({ min, max }, level) =>
+  level.mode === 'program'
+    ? { min: Math.min(min, level.id), max: Math.max(max, level.id) }
+    : { min, max }, { min: Infinity, max: -Infinity });
+export const isProgrammingLevel=(id:number)=>Number.isInteger(id)&&id>=programmingBand.min&&id<=programmingBand.max;
 
 /** 编程关卡初始电路 = 第 44 关参考整机，ROM 清空待玩家编写。 */
 export function programmingMachine(levelId:number):Circuit {

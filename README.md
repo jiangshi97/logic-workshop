@@ -1,4 +1,4 @@
-# 逻辑工坊：56 关，从逻辑门到汇编程序
+# 逻辑工坊：从逻辑门到汇编程序
 
 从信号连线开始，逐步搭建逻辑门、加减法器、寄存器与存储器，最后连接成能执行指令的八位计算机，并用汇编完成算法任务。
 
@@ -23,7 +23,7 @@ npm.cmd run dev -- --port 5173
 
 ## 已实现
 
-- 56 关：第1–20关组合逻辑、第21–32关“状态与时间”、第33–44关“计算机架构”、第45–56关“编程应用”。
+- 57 关：第1–20关组合逻辑、第21–32关“状态与时间”、第33–44关“计算机架构”、第45–56关“编程应用”，全部关卡均为 content/levels/ 下的声明式 JSON 数据。
 - 鼠标拖动与点击连线、逻辑门拖放、节点移动、框选、复制、删除、撤销重做。
 - 1/2/4/8/16位信号；支持部分未知位、多输出接口、总线拆分与合并、可配置常量。
 - 独立数学参考函数和时序状态机判题；失败自动完整回放，输出和相关导线高亮；抽样关明确标示测试集。
@@ -46,7 +46,7 @@ npm.cmd run dev -- --port 5173
 
 后台判题编译一次门级图，按拓扑计算实际门、总线及三值信号；时序场景先求旧值、同时提交状态、再求新值，每个场景从零开始，程序场景使用独立ROM。实时仿真和判题使用不同线程，编辑或切关会取消过期判题。交互仍依赖锁定SynchEngine的同步信号提交行为，升级库应重跑等价测试。完整44证明后台重验实测约1.23秒（本机），不承诺所有设备同速。
 
-历史通关证明独立于草稿，修改或重置不会抹掉学习进度，但旧结果不能证明新草稿。v5存档包含56关草稿、证明、输入值、ROM字、已应用汇编源和完整组件库/旧版本；兼容v1四关、v2二十关、v3三十二关、v4四十四关。导入在后台检查结构并重验连续证明，成功后一次性替换工作区。非ROM节点携带words会拒绝导入。
+历史通关证明独立于草稿，修改或重置不会抹掉学习进度，但旧结果不能证明新草稿。v5存档包含全部关卡草稿、证明、输入值、ROM字、已应用汇编源和完整组件库/旧版本；兼容v1四关、v2二十关、v3三十二关、v4四十四关。导入在后台检查结构并重验连续证明，成功后一次性替换工作区。非ROM节点携带words会拒绝导入。
 
 寄存器与RAM实例按路径隔离。切关、结构/ROM变化、导入或刷新重新从零试验，移动节点保留状态。寄存器、RAM运行数据、周期数和波形不写入存档。ROM程序保留。
 
@@ -111,17 +111,17 @@ CPU与组件依赖固定，允许移动布局、观察内部电路和编写程�
 
 | 文件 | 职责 |
 |---|---|
-| content/levels/ | 声明式关卡（第 1–20 关 JSON 数据，期望值为独立数学表达式） |
+| content/levels/ | 声明式关卡（全部 57 关 JSON 数据：文案、提示、期望表达式/场景帧/编程用例或生成器引用） |
 | src/levelSpec.ts、src/levelExpr.ts、src/levelRegistry.ts | 关卡编写 API：校验、编译与表达式求值 |
+| src/levelGenerators.ts | 命名场景/用例生成器：JSON 引用、编译期展开穷举判题数据 |
 | src/WorkshopView.tsx | 元件工坊：独立于关卡自由搭建/修改自定义组件 |
 | src/libraryGrouping.ts | 组件库展示分组：相似元件按家族合并、位宽变体小选择框切换 |
-| src/levels.ts | 关卡目录与四阶段聚合 |
-| src/sequentialLevels.ts | 第 21–32 关与独立时序参考场景 |
-| src/architectureLevels.ts、src/architectureSpec.ts | 第33–44关、指令规格、独立状态机和程序测试 |
+| src/levels.ts | 关卡目录聚合（启动期关卡号守卫） |
+| src/architectureSpec.ts | 指令集规格、独立数学参考机与测试程序 |
 | src/architectureCircuits.ts | 可查看的门级教学组件与合法参考电路 |
 | src/combinationalEvaluator.ts、src/sequentialEvaluator.ts | 真实门级图的编译判题与三值状态更新 |
 | src/ArchitecturePanel.tsx、src/programEditor.ts | 机器观察、ROM程序编辑与校验 |
-| src/assembler.ts、src/programmingSpec.ts、src/programmingLevels.ts | 汇编器、第45–56关数学任务及参考源 |
+| src/assembler.ts、src/programmingSpec.ts | 汇编器、第45–56关数学任务及参考源 |
 | src/programmingMachine.ts、src/programmingRunner.ts | 固定门级CPU、输入初始化、输出事件、预算及调试 |
 | src/ProgrammingPanel.tsx | 汇编工作台、断点、RAM和程序测试 |
 | src/model.ts | 电路、连接与合法性 |

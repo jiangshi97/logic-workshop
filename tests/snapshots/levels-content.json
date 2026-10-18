@@ -16997,6 +16997,325 @@
    ]
   ]
  },
+ "judging": {
+  "1": {
+   "kind": "combinational",
+   "samples": 2,
+   "digest": "e95e2809372403d6"
+  },
+  "2": {
+   "kind": "combinational",
+   "samples": 4,
+   "digest": "5caf8bc2595f3c26"
+  },
+  "3": {
+   "kind": "combinational",
+   "samples": 2,
+   "digest": "26bf27cb277c8976"
+  },
+  "4": {
+   "kind": "combinational",
+   "samples": 4,
+   "digest": "dcb9b045e483b5bd"
+  },
+  "5": {
+   "kind": "combinational",
+   "samples": 4,
+   "digest": "089fda5aba87e147"
+  },
+  "6": {
+   "kind": "combinational",
+   "samples": 4,
+   "digest": "0eb3ec6311cc8122"
+  },
+  "7": {
+   "kind": "combinational",
+   "samples": 4,
+   "digest": "31e22779cf92e356"
+  },
+  "8": {
+   "kind": "combinational",
+   "samples": 8,
+   "digest": "86227c2a15226c64"
+  },
+  "9": {
+   "kind": "combinational",
+   "samples": 8,
+   "digest": "0e52d7544e69069a"
+  },
+  "10": {
+   "kind": "combinational",
+   "samples": 4,
+   "digest": "ee8e48a5a33ad632"
+  },
+  "11": {
+   "kind": "combinational",
+   "samples": 16,
+   "digest": "731ca7b6b9c0e094"
+  },
+  "12": {
+   "kind": "combinational",
+   "samples": 512,
+   "digest": "0f1b047242ae4c4d"
+  },
+  "13": {
+   "kind": "combinational",
+   "samples": 16,
+   "digest": "f2edc4dd7029c853"
+  },
+  "14": {
+   "kind": "combinational",
+   "samples": 256,
+   "digest": "a9e3ba4e167eaa05"
+  },
+  "15": {
+   "kind": "combinational",
+   "samples": 4,
+   "digest": "4376f75e25d72ffd"
+  },
+  "16": {
+   "kind": "combinational",
+   "samples": 8,
+   "digest": "26d8a2c3a4c49ddd"
+  },
+  "17": {
+   "kind": "combinational",
+   "samples": 32,
+   "digest": "7209ab110cfb07ed"
+  },
+  "18": {
+   "kind": "combinational",
+   "samples": 512,
+   "digest": "64dcb9addc744ae7"
+  },
+  "19": {
+   "kind": "combinational",
+   "samples": 16,
+   "digest": "659c62a721a10570"
+  },
+  "20": {
+   "kind": "combinational",
+   "samples": 256,
+   "digest": "77aa1b8ae0934d97"
+  },
+  "21": {
+   "kind": "sequential",
+   "scenarios": 1,
+   "steps": 9,
+   "digest": "966be1f9ba453b82"
+  },
+  "22": {
+   "kind": "sequential",
+   "scenarios": 2,
+   "steps": 16,
+   "digest": "91a8b056e79e3459"
+  },
+  "23": {
+   "kind": "sequential",
+   "scenarios": 2,
+   "steps": 16,
+   "digest": "e6dd02cb1e90612b"
+  },
+  "24": {
+   "kind": "sequential",
+   "scenarios": 2,
+   "steps": 1032,
+   "digest": "072fa8b8c59e137b"
+  },
+  "25": {
+   "kind": "sequential",
+   "scenarios": 2,
+   "steps": 16,
+   "digest": "f3209b3765a069af"
+  },
+  "26": {
+   "kind": "sequential",
+   "scenarios": 1,
+   "steps": 107,
+   "digest": "5bdd78a20608878a"
+  },
+  "27": {
+   "kind": "sequential",
+   "scenarios": 3,
+   "steps": 382,
+   "digest": "b2624596b9c0b122"
+  },
+  "28": {
+   "kind": "sequential",
+   "scenarios": 16,
+   "steps": 256,
+   "digest": "d5bd5fd2ab5440fe"
+  },
+  "29": {
+   "kind": "sequential",
+   "scenarios": 1,
+   "steps": 73,
+   "digest": "be726770c2073566"
+  },
+  "30": {
+   "kind": "sequential",
+   "scenarios": 32,
+   "steps": 640,
+   "digest": "01465c6ca821da53"
+  },
+  "31": {
+   "kind": "sequential",
+   "scenarios": 64,
+   "steps": 2048,
+   "digest": "f45569a4f7421d5e"
+  },
+  "32": {
+   "kind": "sequential",
+   "scenarios": 64,
+   "steps": 2304,
+   "digest": "c6eff5189e4f3462"
+  },
+  "33": {
+   "kind": "combinational",
+   "samples": 4560,
+   "digest": "1a33180c549e8f4a"
+  },
+  "34": {
+   "kind": "combinational",
+   "samples": 9120,
+   "digest": "2cf83d1af697fbb6"
+  },
+  "35": {
+   "kind": "sequential",
+   "scenarios": 1,
+   "steps": 1797,
+   "digest": "75e587b1da4689d2"
+  },
+  "36": {
+   "kind": "sequential",
+   "scenarios": 1,
+   "steps": 1033,
+   "digest": "25317400de546599"
+  },
+  "37": {
+   "kind": "combinational",
+   "samples": 65536,
+   "digest": "924ec26bf843c547"
+  },
+  "38": {
+   "kind": "sequential",
+   "scenarios": 2,
+   "steps": 2066,
+   "digest": "a3d9288b5d1e1840"
+  },
+  "39": {
+   "kind": "sequential",
+   "scenarios": 1,
+   "steps": 76,
+   "digest": "d80f28d53b3a1d66"
+  },
+  "40": {
+   "kind": "combinational",
+   "samples": 10480,
+   "digest": "428c2de3a3d4a75b"
+  },
+  "41": {
+   "kind": "sequential",
+   "scenarios": 1,
+   "steps": 1286,
+   "digest": "f08fa1c436e5ae12"
+  },
+  "42": {
+   "kind": "sequential",
+   "scenarios": 1,
+   "steps": 773,
+   "digest": "114ed8cbac4aa66a"
+  },
+  "43": {
+   "kind": "sequential",
+   "scenarios": 12,
+   "steps": 682,
+   "digest": "1e9d0cd4a49c58de"
+  },
+  "44": {
+   "kind": "sequential",
+   "scenarios": 10,
+   "steps": 525,
+   "digest": "44ef38f8cebcf3e1"
+  },
+  "45": {
+   "kind": "program",
+   "cases": 1,
+   "digest": "cac29a980145deed",
+   "referenceSourceChars": 36
+  },
+  "46": {
+   "kind": "program",
+   "cases": 1,
+   "digest": "d65b06dcca2c3d7b",
+   "referenceSourceChars": 48
+  },
+  "47": {
+   "kind": "program",
+   "cases": 256,
+   "digest": "88c048d51dc02ee7",
+   "referenceSourceChars": 26
+  },
+  "48": {
+   "kind": "program",
+   "cases": 12,
+   "digest": "dd7ca4a931e2b9ed",
+   "referenceSourceChars": 59
+  },
+  "49": {
+   "kind": "program",
+   "cases": 14,
+   "digest": "ce79de9a5dd7012b",
+   "referenceSourceChars": 40
+  },
+  "50": {
+   "kind": "program",
+   "cases": 12,
+   "digest": "814e9d41589d16f9",
+   "referenceSourceChars": 164
+  },
+  "51": {
+   "kind": "program",
+   "cases": 14,
+   "digest": "fc484f8c06d0da34",
+   "referenceSourceChars": 148
+  },
+  "52": {
+   "kind": "program",
+   "cases": 12,
+   "digest": "a0012ac27ee36296",
+   "referenceSourceChars": 239
+  },
+  "53": {
+   "kind": "program",
+   "cases": 14,
+   "digest": "fb6e2171dcdca2c2",
+   "referenceSourceChars": 122
+  },
+  "54": {
+   "kind": "program",
+   "cases": 10,
+   "digest": "c7ef9420ae1b679f",
+   "referenceSourceChars": 454
+  },
+  "55": {
+   "kind": "program",
+   "cases": 12,
+   "digest": "f2b9c3bb14469654",
+   "referenceSourceChars": 307
+  },
+  "56": {
+   "kind": "program",
+   "cases": 21,
+   "digest": "0a86612b9daf7a42",
+   "referenceSourceChars": 224
+  },
+  "57": {
+   "kind": "combinational",
+   "samples": 256,
+   "digest": "83d0a891a575c0b8"
+  }
+ },
  "meta": [
   {
    "id": 1,
@@ -17407,6 +17726,13 @@
    "chapter": 7,
    "mode": "program",
    "allowedCount": 12
+  },
+  {
+   "id": 57,
+   "title": "测试关卡",
+   "chapter": 7,
+   "allowedCount": 12,
+   "rewardName": "测试"
   }
  ]
 }

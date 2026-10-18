@@ -1,0 +1,29 @@
+{
+  "id": 52,
+  "title": "累加求和",
+  "caption": "嵌套循环与中间状态",
+  "goal": "输出 1+2+…+n 的模 256 结果，n 来自 RAM[240]；n=0 时输出 0。",
+  "formula": "OUT = n(n+1)/2 mod 256",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["一个计数器记录正在累加的数，另一个计数器实现动态加法。","将计数器与累计值放进不同 RAM 单元。","先判断零值，再递减，避免把 0 回绕到 255。"],
+  "program": {
+      "cases": [
+        {"id":"program-52-1","label":"RAM[240]=0","memory":{"240":0},"expectedOutput":[0],"maxCycles":125},
+        {"id":"program-52-2","label":"RAM[240]=1","memory":{"240":1},"expectedOutput":[1],"maxCycles":195},
+        {"id":"program-52-3","label":"RAM[240]=2","memory":{"240":2},"expectedOutput":[3],"maxCycles":300},
+        {"id":"program-52-4","label":"RAM[240]=3","memory":{"240":3},"expectedOutput":[6],"maxCycles":440},
+        {"id":"program-52-5","label":"RAM[240]=4","memory":{"240":4},"expectedOutput":[10],"maxCycles":615},
+        {"id":"program-52-6","label":"RAM[240]=5","memory":{"240":5},"expectedOutput":[15],"maxCycles":825},
+        {"id":"program-52-7","label":"RAM[240]=6","memory":{"240":6},"expectedOutput":[21],"maxCycles":1070},
+        {"id":"program-52-8","label":"RAM[240]=7","memory":{"240":7},"expectedOutput":[28],"maxCycles":1350},
+        {"id":"program-52-9","label":"RAM[240]=8","memory":{"240":8},"expectedOutput":[36],"maxCycles":1665},
+        {"id":"program-52-10","label":"RAM[240]=22","memory":{"240":22},"expectedOutput":[253],"maxCycles":9750},
+        {"id":"program-52-11","label":"RAM[240]=23","memory":{"240":23},"expectedOutput":[20],"maxCycles":10590},
+        {"id":"program-52-12","label":"RAM[240]=31","memory":{"240":31},"expectedOutput":[240],"maxCycles":18570}
+      ],
+      "referenceSource": "; 外层从 n 倒数，内层将当前计数加到累计值\nLOAD 240\nSTORE 244\nMOVI A, 0\nSTORE 245\nMOVI B, 1\nouter: LOAD 244\nJZ done\nSTORE 246\ninner: LOAD 246\nJZ next\nSUB\nSTORE 246\nLOAD 245\nADD\nSTORE 245\nJMP inner\nnext: LOAD 244\nSUB\nSTORE 244\nJMP outer\ndone: LOAD 245\nOUT\nHLT"
+  }
+}

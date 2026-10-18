@@ -24,7 +24,8 @@ const fibonacci = (n: number): number => {
 /** 生成某关全部公开用例：输入写入 RAM 240 起，期望输出为完整 OUT 序列；maxCycles 是周期预算。 */
 export function programmingCases(id: number): ProgramCase[] {
   const registered = programCaseRegistry.get(id);
-  if (registered) return registered;
+  // 注册表数据来自 JSON 编译的共享对象，逐次深拷贝以保持与旧 switch 相同的“每次新建”语义。
+  if (registered) return structuredClone(registered);
   const result: ProgramCase[] = [];
   const add = (values: number[], output: number[], maxCycles: number, expectedMemory?: Record<number, number>, extraMemory: Record<number, number> = {}) => {
     result.push({ id: `program-${id}-${result.length + 1}`,

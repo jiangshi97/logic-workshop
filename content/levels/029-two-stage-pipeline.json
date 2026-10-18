@@ -1,0 +1,49 @@
+{
+  "id": 29,
+  "title": "两级流水",
+  "caption": "同时采样旧状态",
+  "goal": "两个四位寄存器共享 E 和 R。沿上第一级保存 D，第二级保存第一级的旧值，第二级输出 Q。",
+  "formula": "沿上 Stage1 ← D；Q ← 旧 Stage1（E=1，R=0）",
+  "chapter": 5,
+  "inputs": [
+    [
+      "D",
+      4
+    ],
+    [
+      "E",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      4
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "一个沿上所有寄存器同时采样。",
+    "第二级收到的是沿发生前第一级的值。",
+    "串联两个使能寄存器，共享 E、R；关闭 E 时两个阶段都保持。"
+  ],
+  "rewardName": "Pipeline4",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "id": 28,
+  "title": "串行移位",
+  "caption": "一次进入一位",
+  "goal": "沿上使能时把 Q 左移一位，In 写入最低位；最高位丢弃。复位优先。",
+  "formula": "沿上 Q ← R ? 0 : E ? (2Q+In) mod 16 : Q",
+  "chapter": 5,
+  "inputs": [
+    [
+      "In",
+      1
+    ],
+    [
+      "E",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      4
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "拆开旧 Q 的四个位，改变连接的位置。",
+    "新 bit0 接 In，新 bit1/2/3 接旧 bit0/1/2。",
+    "JOIN 合成移位结果，用 E 选择它或旧 Q，再接 DFF。"
+  ],
+  "rewardName": "Shift4",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

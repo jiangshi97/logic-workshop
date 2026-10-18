@@ -1,0 +1,18 @@
+{
+  "id": 46,
+  "title": "字节运算与溢出",
+  "caption": "用程序观察模 256 运算",
+  "goal": "计算 250+13−5，输出八位结果 2，然后正常停止。",
+  "formula": "(250 + 13 − 5) mod 256 = 2",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["MOVI B 设置另一个运算数。","ADD 和 SUB 把结果写回 A，并更新零标志 Z。","字节溢出保留低八位：263 会变成 7。"],
+  "program": {
+      "cases": [
+        {"id":"program-46-1","label":"无输入","memory":{},"expectedOutput":[2],"maxCycles":90}
+      ],
+      "referenceSource": "MOVI A, 250\nMOVI B, 13\nADD\nMOVI B, 5\nSUB\nOUT\nHLT"
+  }
+}

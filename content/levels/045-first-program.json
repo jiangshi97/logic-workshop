@@ -1,0 +1,18 @@
+{
+  "id": 45,
+  "title": "第一个汇编程序",
+  "caption": "用三条指令控制计算机",
+  "goal": "输出 42，且执行 HLT 正常停止。",
+  "formula": "OUT = 42",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["MOVI A, 42 把立即数写入 A。","OUT 会记录当前 A，每次执行都产生一条输出事件。","最后写 HLT；空 ROM 会一直执行 NOP。"],
+  "program": {
+      "cases": [
+        {"id":"program-45-1","label":"无输入","memory":{},"expectedOutput":[42],"maxCycles":90}
+      ],
+      "referenceSource": "; 把立即数送到输出端口，然后停止\nMOVI A, 42\nOUT\nHLT"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "id": 21,
+  "title": "记住一个信号",
+  "caption": "第一次跨越时间",
+  "goal": "初始 Q=0。改变 D 时 Q 保持；每次时钟沿后 Q 记住当前 D。",
+  "formula": "沿上 Q ← D；无沿保持",
+  "chapter": 5,
+  "inputs": [
+    [
+      "D",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "DFF 是有记忆的元件，初始输出为 0。",
+    "d 接数据，rst 是同步复位，q 输出保存的值。",
+    "D 接 d，CONST 0 接 rst，q 接 Q；改变 D 后按单步观察。"
+  ],
+  "rewardName": "Register1",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

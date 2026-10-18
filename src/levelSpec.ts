@@ -1,13 +1,15 @@
 // 关卡编写 API：声明式 LevelSpec（JSON 兼容）的运行时校验与编译。
 // 一份 spec 数据即可描述任意模式的关卡：文案、端口、可用门型、提示与期望值全部是数据；
 // compileLevelSpec 把它编译成内部 Level——组合关期望来自表达式/真值表，时序关期望预填在帧里，
-// 编程关用例进入下方注册表供 programmingSpec 查询。期望值依然独立于任何电路或仿真器。
-// 21–56 关的有状态数学机器较复杂，仍以 TS 编写（defineLevel 同样走本编译器）；JSON 是推荐的新关卡入口。
+// 编程关用例进入注册表供 programmingSpec 查询。全部 57 关均由 content/levels/*.json 描述，
+// 海量穷举数据（时序帧/公开用例）以命名生成器引用（levelGenerators.ts）在编译期展开，JSON 保持小体积；
+// defineLevel 是 TS 逃生门（同样走本编译器），供需要在代码里组装 spec 的场景。
 import type { GateType, Inputs, Outputs, Port, TestSequence } from './contracts';
 import type { Level } from './levels';
 import type { ProgramCase } from './programmingSpec';
 import { compileExpression } from './levelExpr';
 import { gateTypes } from './gates';
+import { caseGenerators, scenarioGenerators, type GeneratorContext } from './levelGenerators';
 
 /** 门类型解锁表：[门型, 首次可用关卡]，仅对第 1–20 关的组合关卡有推导意义。 */
 export const gateUnlocks: [GateType, number][] = [
@@ -20,16 +22,23 @@ export interface CombinationalSpec {
   /** 每个输出端口一条整数表达式（见 levelExpr）；与 truthTable 二选一。 */
   expect?: Record<string, string>;
   truthTable?: TruthTableRow[];
-  /** 公开测试集；缺省时判题穷举全部输入组合。 */
-  cases?: Record<string, number>[];
+  /** 公开测试集：手写数组或 `"generator"` 引用（src/levelGenerators.ts）；缺省时判题穷举全部输入组合。 */
+  cases?: Record<string, number>[] | { generator: string };
 }
 export interface ScenarioSpec {
   /** 缺省自动生成 level-N-scenario-K。 */
   id?: string;
   label: string;
+  /** 本场景预置的 ROM 指令字（最多 256 个 16 位字），供取指/整机关卡逐场景换程序。 */
+  program?: number[];
   steps: { inputs: Record<string, number>; tick?: boolean; expected: Record<string, number> }[];
 }
-export interface SequentialSpec { scenarios: ScenarioSpec[]; }
+export interface SequentialSpec {
+  /** 手写场景，适合步数可控的新关卡；与 generator 二选一。 */
+  scenarios?: ScenarioSpec[];
+  /** 命名场景生成器（src/levelGenerators.ts）：编译期展开穷举帧，保持 JSON 小体积。 */
+  generator?: string;
+}
 export interface ProgramCaseSpec {
   id?: string;
   label: string;
@@ -140,28 +149,57 @@ function validateCombinational(id: number, section: unknown, inputPorts: Port[],
         if (value > 2 ** outputPorts.find(p => p.id === key)!.bits - 1) fail(id, `真值表第 ${index + 1} 行输出“${key}”超出位宽。`);
     });
   }
-  if (spec.cases !== undefined) {
-    if (!Array.isArray(spec.cases) || spec.cases.length === 0) fail(id, 'cases 必须是非空数组。');
-    spec.cases.forEach((sample, index) => {
-      const inputs = parseIntRecord(id, sample, `cases 第 ${index + 1} 项`, inputIds, 0, Infinity);
-      for (const key of inputIds) if (!(key in inputs)) fail(id, `cases 第 ${index + 1} 项缺少输入端口“${key}”。`);
-      for (const [port, value] of Object.entries(inputs))
-        if (value > 2 ** inputPorts.find(p => p.id === port)!.bits - 1) fail(id, `cases 第 ${index + 1} 项输入“${port}”超出位宽。`);
-    });
-  }
+  if (spec.cases !== undefined) validateCaseSection(id, spec.cases, inputPorts);
   return spec;
+}
+
+/** 校验公开用例集：手写数组立即校验；生成器引用只查名字，展开数据在编译期走同一校验。 */
+function validateCaseSection(id: number, cases: CombinationalSpec['cases'], inputPorts: Port[]): void {
+  if (!Array.isArray(cases)) {
+    if (!isRecord(cases) || typeof (cases as { generator?: unknown }).generator !== 'string'
+      || !(cases as { generator: string }).generator) fail(id, 'cases 必须是非空数组或 { "generator": "名字" }。');
+    return;
+  }
+  validateCaseList(id, cases, inputPorts);
+}
+
+/** 校验用例列表内容（手写与生成器展开共用）。 */
+function validateCaseList(id: number, cases: unknown, inputPorts: Port[]): asserts cases is Record<string, number>[] {
+  if (!Array.isArray(cases) || cases.length === 0) fail(id, 'cases 必须是非空数组。');
+  const inputIds = new Set(inputPorts.map(p => p.id));
+  cases.forEach((sample, index) => {
+    const inputs = parseIntRecord(id, sample, `cases 第 ${index + 1} 项`, inputIds, 0, Infinity);
+    for (const key of inputIds) if (!(key in inputs)) fail(id, `cases 第 ${index + 1} 项缺少输入端口“${key}”。`);
+    for (const [port, value] of Object.entries(inputs))
+      if (value > 2 ** inputPorts.find(p => p.id === port)!.bits - 1) fail(id, `cases 第 ${index + 1} 项输入“${port}”超出位宽。`);
+  });
 }
 
 function validateSequential(id: number, section: unknown, inputPorts: Port[], outputPorts: Port[]): SequentialSpec {
   if (!isRecord(section)) fail(id, 'sequential 段必须是对象。');
   const spec = section as unknown as SequentialSpec;
-  if (!Array.isArray(spec.scenarios) || spec.scenarios.length === 0) fail(id, 'scenarios 不能为空。');
+  const hasScenarios = spec.scenarios !== undefined, hasGenerator = spec.generator !== undefined;
+  if (hasScenarios === hasGenerator) fail(id, 'sequential 段必须且只能提供 scenarios 或 generator 之一。');
+  if (hasGenerator) {
+    if (typeof spec.generator !== 'string' || !spec.generator) fail(id, 'generator 必须是非空字符串。');
+  } else validateScenarioList(id, spec.scenarios!, inputPorts, outputPorts);
+  return spec;
+}
+
+/** 校验场景列表内容（手写与生成器展开共用）。 */
+function validateScenarioList(id: number, scenarios: ScenarioSpec[], inputPorts: Port[], outputPorts: Port[]): void {
+  if (!Array.isArray(scenarios) || scenarios.length === 0) fail(id, 'scenarios 不能为空。');
   const inputIds = new Set(inputPorts.map(p => p.id));
   const outputIds = new Set(outputPorts.map(p => p.id));
-  spec.scenarios.forEach((scenario, index) => {
+  scenarios.forEach((scenario, index) => {
     if (!isRecord(scenario)) fail(id, `scenarios 第 ${index + 1} 项必须是对象。`);
     if (typeof scenario.label !== 'string' || !scenario.label) fail(id, `scenarios 第 ${index + 1} 项缺少 label。`);
     if (!Array.isArray(scenario.steps) || scenario.steps.length === 0) fail(id, `场景“${scenario.label}”的 steps 不能为空。`);
+    if (scenario.program !== undefined) {
+      if (!Array.isArray(scenario.program) || scenario.program.length > 256
+        || scenario.program.some(word => whole(word) === undefined || word < 0 || word > 65535))
+        fail(id, `场景“${scenario.label}”的 program 必须是最多 256 个 16 位指令字。`);
+    }
     scenario.steps.forEach((step, stepIndex) => {
       if (!isRecord(step)) fail(id, `场景“${scenario.label}”第 ${stepIndex + 1} 步必须是对象。`);
       if (step.tick !== undefined && typeof step.tick !== 'boolean') fail(id, `场景“${scenario.label}”第 ${stepIndex + 1} 步的 tick 必须是布尔值。`);
@@ -172,7 +210,6 @@ function validateSequential(id: number, section: unknown, inputPorts: Port[], ou
         if (value > 2 ** outputPorts.find(p => p.id === key)!.bits - 1) fail(id, `场景“${scenario.label}”第 ${stepIndex + 1} 步期望“${key}”超出位宽。`);
     });
   });
-  return spec;
 }
 
 function validateProgram(id: number, section: unknown): ProgramSpec {
@@ -245,6 +282,22 @@ export function compileLevelSpec(input: unknown): Level {
         [output, compileExpression(source, inputIds)]))
     : undefined;
 
+  // 生成器引用在此展开为具体帧/用例数据，并复用手写数据的同一套校验，两条路径编译结果完全一致。
+  const expandWith = <T>(registry: Map<string, (context: GeneratorContext) => T[]>, name: string, validate: (data: T[]) => void): T[] => {
+    const generator = registry.get(name);
+    if (!generator) fail(spec.id, `未知的生成器“${name}”。`);
+    const data = generator({ id: spec.id, inputPorts, outputPorts });
+    validate(data);
+    return data;
+  };
+  const scenarios = spec.sequential === undefined ? undefined
+    : spec.sequential.scenarios !== undefined ? spec.sequential.scenarios
+    : expandWith(scenarioGenerators, spec.sequential.generator!,
+      data => validateScenarioList(spec.id, data, inputPorts, outputPorts));
+  const publicCases = spec.combinational?.cases === undefined ? undefined
+    : Array.isArray(spec.combinational.cases) ? spec.combinational.cases
+    : expandWith(caseGenerators, spec.combinational.cases.generator, data => validateCaseList(spec.id, data, inputPorts));
+
   const expectedOutputs = (inputs: Inputs): Outputs => {
     if (spec.combinational?.truthTable) {
       const key = inputPorts.map(p => inputs[p.id]).join(',');
@@ -261,14 +314,15 @@ export function compileLevelSpec(input: unknown): Level {
       return outputs;
     }
     // 时序/编程关的 expectedOutputs 仅供兼容展示：真正的判题走 sequences 场景与编程用例。
-    if (spec.sequential) return { ...spec.sequential.scenarios[0].steps[0].expected };
+    if (scenarios) return { ...scenarios[0].steps[0].expected };
     return {};
   };
 
-  const sequences = spec.sequential
-    ? (): TestSequence[] => spec.sequential!.scenarios.map((scenario, index) => ({
+  const sequences = scenarios
+    ? (): TestSequence[] => scenarios.map((scenario, index) => ({
         id: scenario.id ?? `level-${spec.id}-scenario-${index + 1}`,
         label: scenario.label,
+        ...(scenario.program ? { program: [...scenario.program] } : {}),
         steps: scenario.steps.map(step => ({
           inputs: { ...defaults, ...step.inputs },
           tick: step.tick ?? true,
@@ -299,8 +353,8 @@ export function compileLevelSpec(input: unknown): Level {
     ...(spec.defaultProgram ? { defaultProgram: [...spec.defaultProgram] } : {}),
     expectedOutputs,
     ...(mode ? { mode } : {}),
-    ...(sequences ? { sequences } : {}),
-    ...(spec.combinational?.cases ? { cases: () => spec.combinational!.cases!.map(sample => ({ ...sample })) } : {}),
+    ...(scenarios ? { sequences } : {}),
+    ...(publicCases ? { cases: () => publicCases.map(sample => ({ ...sample })) } : {}),
   };
 }
 

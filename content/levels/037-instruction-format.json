@@ -1,0 +1,16 @@
+{
+  "id": 37,
+  "title": "指令格式",
+  "caption": "从十六位指令中读出含义",
+  "goal": "分离 Opcode、Param、Imm，并校验操作码与保留位。MOVI 参数只允许 0/1；地址指令参数必须 0；其他合法指令参数和立即数均为 0。",
+  "formula": "Instruction=Opcode×4096+Param×256+Imm",
+  "chapter": 6,
+  "inputs": [["Instruction",16]],
+  "outputs": [["Opcode",4],["Param",4],["Imm",8],["Valid",1]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF"],
+  "hints": ["低八位是立即数或地址；中间四位是参数；高四位是操作码。","0–9 是合法操作码，10–15 非法。","MOVI(1) 参数≤1；LOAD/STORE/JMP/JZ(4–7) 参数=0；NOP/ADD/SUB/OUT/HLT 的参数和立即数都为0。"],
+  "rewardName": "InstructionDecoder",
+  "combinational": {
+      "expect": { "Opcode": "Instruction div 4096", "Param": "(Instruction div 256) mod 16", "Imm": "Instruction mod 256", "Valid": "(Instruction div 4096) = 1 ? ((Instruction div 256) mod 16 <= 1 ? 1 : 0) : ((Instruction div 4096) >= 4) & ((Instruction div 4096) <= 7) ? ((Instruction div 256) mod 16 = 0 ? 1 : 0) : (Instruction div 4096) <= 9 ? (((Instruction div 256) mod 16 = 0 ? 1 : 0) & (Instruction mod 256 = 0 ? 1 : 0)) : 0" }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "id": 38,
+  "title": "取指电路",
+  "caption": "沿上先取旧地址的指令",
+  "goal": "ROM 保存程序。使能沿上 IR 记住旧 PC 对应的指令，再让 PC 顺序前进或跳转。R 优先清零 PC 和 IR，ROM 保留。",
+  "formula": "沿上 IR←ROM[旧PC]；PC←Jump?Target:PC+1（E=1）",
+  "chapter": 6,
+  "inputs": [
+    [
+      "E",
+      1
+    ],
+    [
+      "Jump",
+      1
+    ],
+    [
+      "Target",
+      8
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "PC",
+      8
+    ],
+    [
+      "IR",
+      16
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF",
+    "ROM"
+  ],
+  "hints": [
+    "ROM 的 addr 接 PC，q 接 IR 的数据输入。",
+    "IR 与 PC 同步采样，所以 IR 取得沿发生前地址的数据。",
+    "ROM 节点 ID 使用 program；PC 和 IR 共享 E 与 R，复位不修改程序。"
+  ],
+  "rewardName": "InstructionFetch",
+  "defaultProgram": [
+    4103,
+    4357,
+    8192,
+    20720,
+    4096,
+    16624,
+    32768,
+    36864
+  ],
+  "sequential": {
+    "generator": "architecture"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "id": 24,
+  "title": "八位寄存器",
+  "caption": "保存完整字节",
+  "goal": "保存 0–255 的八位数据；沿上复位优先，使能关闭时保持。",
+  "formula": "沿上 Q8 ← R ? 0 : E ? D8 : Q8",
+  "chapter": 5,
+  "inputs": [
+    [
+      "D",
+      8
+    ],
+    [
+      "E",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      8
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "把上一关结构扩展为八位。",
+    "八位 DFF 与数据通路的位宽要一致。",
+    "八个选择器共享 E，JOIN 合成八位送 d；也可用八位逻辑门。"
+  ],
+  "rewardName": "Register8",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": 26,
+  "title": "四位计数器",
+  "caption": "从记忆到累计",
+  "goal": "沿上 R=1 清零；否则 E=1 时 Q 加 1，15 后回到 0。",
+  "formula": "沿上 Q ← R ? 0 : E ? (Q+1) mod 16 : Q",
+  "chapter": 5,
+  "inputs": [
+    [
+      "E",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      4
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "用当前 Q 作为自增器输入。",
+    "自增结果与当前 Q 由 E 选择。",
+    "四位自增后接使能寄存器，R 清零；计数超过 15 会回绕。"
+  ],
+  "rewardName": "Counter4",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

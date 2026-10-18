@@ -1,0 +1,53 @@
+{
+  "id": 31,
+  "title": "四格存储器",
+  "caption": "地址译码与读取",
+  "goal": "两位 Addr 选择四格四位存储单元；写入只改变被选中的格，切换地址立即改变 Q，复位清空全部格。",
+  "formula": "沿上 M[Addr] ← D（W=1）；Q = M[Addr]",
+  "chapter": 5,
+  "inputs": [
+    [
+      "Addr",
+      2
+    ],
+    [
+      "D",
+      4
+    ],
+    [
+      "W",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      4
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "把 Addr 拆成两位并译码成四条选择线。",
+    "每格的使能是 W 与本格选择线相与。",
+    "四个寄存器保存数据，读取通过两层四位 MUX 选择。"
+  ],
+  "rewardName": "Memory4x4",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

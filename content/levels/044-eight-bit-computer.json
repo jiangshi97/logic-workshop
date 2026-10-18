@@ -1,0 +1,93 @@
+{
+  "id": 44,
+  "title": "我的八位计算机",
+  "caption": "让真实电路执行程序",
+  "goal": "用 ROM、RAM 和门级数据通路组成三阶段 CPU。阶段0取指，1译码，2执行并更新 PC。E=0 冻结；R 清空机器与 RAM；HLT/非法保持 PC 与阶段2。Memory 组合显示 IR 低八位地址对应的 RAM 值。",
+  "formula": "Fetch→Decode→Execute；程序驱动真实电路",
+  "chapter": 6,
+  "inputs": [
+    [
+      "E",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "PC",
+      8
+    ],
+    [
+      "IR",
+      16
+    ],
+    [
+      "Phase",
+      2
+    ],
+    [
+      "A",
+      8
+    ],
+    [
+      "B",
+      8
+    ],
+    [
+      "Z",
+      1
+    ],
+    [
+      "Out",
+      8
+    ],
+    [
+      "Halt",
+      1
+    ],
+    [
+      "Fault",
+      1
+    ],
+    [
+      "Memory",
+      8
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF",
+    "ROM",
+    "RAM"
+  ],
+  "hints": [
+    "ROM 节点 ID=program。IR 在阶段0捕获，阶段2用 IR 的控制信号执行。",
+    "普通指令完成后 PC 加1，JMP/JZ 选择目标；HLT/非法将机器停在阶段2（设置 Halt，PC 不更新）。",
+    "E 门控所有状态与 RAM 写入；R 沿上清状态/RAM但保留 ROM，机器观察面板显示真实电路的状态。"
+  ],
+  "rewardName": "Computer8",
+  "defaultProgram": [
+    4103,
+    4357,
+    8192,
+    20720,
+    4096,
+    16624,
+    32768,
+    36864
+  ],
+  "sequential": {
+    "generator": "architecture"
+  }
+}

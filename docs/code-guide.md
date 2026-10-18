@@ -4,7 +4,7 @@
 
 ## 1. 项目概览
 
-「逻辑工坊」是一个数字逻辑教学游戏：共 56 关，玩家从连线开始，逐步搭出逻辑门、加减法器、寄存器、存储器，最终组成一台能真实执行指令的八位 CPU，并在其上用汇编完成算法任务（第 45–56 关 CPU 电路固定，玩家只写程序）。
+「逻辑工坊」是一个数字逻辑教学游戏：共 57 关，全部关卡由 `content/levels/*.json` 声明式描述（见 [关卡编写指南](level-authoring.md)）。玩家从连线开始，逐步搭出逻辑门、加减法器、寄存器、存储器，最终组成一台能真实执行指令的八位 CPU，并在其上用汇编完成算法任务（第 45–56 关 CPU 电路固定，玩家只写程序）。
 
 技术栈：
 
@@ -27,16 +27,14 @@ src/
 ├─ netlist.ts                # 层级组件展开为扁平网表、组合环检测
 ├─ id.ts / vendor.d.ts / gates.ts # 随机 ID 生成 / digitaljs 类型声明 / 门型清单
 │
-├─ levels.ts                 # 关卡接口与四阶段聚合入口（含启动期关卡号守卫）
+├─ levels.ts                 # 关卡接口与聚合入口（含启动期关卡号守卫）
 ├─ levelSpec.ts              # 关卡编写 API：LevelSpec 校验与编译（含编程用例注册表）
 ├─ levelExpr.ts              # 期望值表达式迷你语言（纯整数安全求值器）
 ├─ levelRegistry.ts          # 声明式关卡的统一编译（数据来自 levelData.generated，npm run regen:levels 再生成）
-├─ sequentialLevels.ts       # 第 21–32 关（状态与时间）+ 独立数学参考状态机
+├─ levelGenerators.ts        # 命名场景/用例生成器：JSON 引用，编译期展开穷举判题数据（temporal/architecture 等）
 ├─ architectureSpec.ts       # 指令集规格（编码/译码）、参考 ALU/控制器/整机状态机
-├─ architectureLevels.ts     # 第 33–44 关（计算机架构）+ 测试场景生成
 ├─ architectureCircuits.ts   # 教学组件库（MUX/寄存器/ALU/PC/.../整机）与参考电路
 ├─ programmingSpec.ts        # 第 45–56 关的数学测试用例与参考汇编程序
-├─ programmingLevels.ts      # 第 45–56 关（编程应用）关卡定义
 ├─ programmingMachine.ts     # 编程关卡的固定 CPU 电路、依赖闭包与防篡改校验
 │
 ├─ simulator.ts              # 交互仿真（DigitalJS）与判题入口 judge()
@@ -65,7 +63,7 @@ src/
 ├─ main.tsx / styles.css     # 入口与样式
 
 tests/                       # Vitest 单元测试 (*.test.ts) 与 Playwright 浏览器测试 (*.spec.ts)
-content/levels/              # 声明式关卡（第 1–20 关，JSON，见 docs/level-authoring.md）
+content/levels/              # 声明式关卡（全部 57 关，JSON，见 docs/level-authoring.md）
 docs/                        # 各阶段设计/验收文档与示例存档
 scripts/start-server.mjs     # 本地后台开发服务
 ```
@@ -100,7 +98,7 @@ scripts/start-server.mjs     # 本地后台开发服务
 
 两条不可违背的设计原则贯穿全库：
 
-1. **期望值独立**：每关的期望输出由独立数学函数产生（`levels.ts` 的闭包、`sequentialLevels.ts` 的 `mathematicalMachine`、`architectureSpec.ts` 的 `architectureOracle`、`programmingSpec.ts` 的数学用例），不经过任何电路或仿真器。判题永远是「玩家电路的实际行为 vs 数学期望」。
+1. **期望值独立**：每关的期望输出由独立数学定义产生（组合关是 `levelExpr.ts` 求值的整数表达式、时序关是 `levelGenerators.ts` 参考状态机展开的帧、编程关是 `programmingSpec.ts` 的数学用例；`architectureSpec.ts` 的 ALU/译码/控制器函数仍是教学组件电路与测试的数学权威），不经过任何电路或仿真器。判题永远是「玩家电路的实际行为 vs 数学期望」。
 2. **判题即真实门级仿真**：没有任何指令解释器。编程关卡也编译玩家保存的 ROM 到真实门级图上逐周期执行（`programmingRunner.ts`），观察到的 PC/IR/Phase 全部来自电路信号。
 
 ## 4. 核心数据模型（contracts.ts）
@@ -187,9 +185,9 @@ Worker 承担全部重活，主线程只做 UI：
 
 ## 8. 关卡内容组织
 
-- `levels.ts` 定义 `Level` 接口（接口端口、允许门型、三层提示、期望函数、模式）并汇总各阶段数组；`chapters` 为章节标题，模块加载时守卫关卡号严格递增。
-- **声明式关卡（第 1–20 关）**：`content/levels/*.json` 是纯数据（文案、端口、提示、期望值表达式/真值表），由 `levelRegistry.ts` 构建期装载、`levelSpec.ts` 运行时校验并编译成 `Level`。期望值是整数表达式（`levelExpr.ts` 求值器），依然独立于任何电路或仿真器；`tests/level-content.test.ts` 的快照固化全部穷举期望，防止悄悄改判题标准。作者指南见 [关卡编写指南](level-authoring.md)。
-- `sequentialLevels.ts` / `architectureLevels.ts` 各自包含「关卡数组 + 独立数学参考机 + 场景生成器」三件事。场景（`TestSequence`）是逐步的 `{inputs, tick, expectedOutputs}` 列表，覆盖保持、复位优先级、同沿读写旧值、回绕等时序细节。这类带状态的参考机也可在 TS 中经 `defineLevel()`（同一编译器）编写。
+- `levels.ts` 定义 `Level` 接口（接口端口、允许门型、三层提示、期望函数、模式）并聚合 `specLevels()`（按 id 排序）；`chapters` 为章节标题，模块加载时守卫关卡号唯一。
+- **全部 57 关都是声明式关卡**：`content/levels/*.json` 是纯数据（文案、端口、提示、期望值表达式/真值表/手写帧/生成器引用/编程用例），由 `levelRegistry.ts` 构建期装载、`levelSpec.ts` 运行时校验并编译成 `Level`（生成器引用在编译期由 `levelGenerators.ts` 展开）。期望值依然独立于任何电路或仿真器；`tests/level-content.test.ts` 的快照固化第 1–20 关全部穷举期望与全关卡判题数据摘要（sha1），防止悄悄改判题标准。作者指南见 [关卡编写指南](level-authoring.md)。
+- 第 21–44 关的时序场景帧（`TestSequence`：逐步 `{inputs, tick, expectedOutputs}`，覆盖保持、复位优先级、同沿读写旧值、回绕等细节）与第 33/34/40 关的公开用例集都以 `"generator": "名字"` 引用 `levelGenerators.ts`，编译期展开并复用手写数据的同一校验——JSON 保持人可编写的小体积，穷举数据由独立参考状态机（`temporalOracle` / `architectureOracle`）产生；第 45–56 关的编程用例与参考源是 JSON 里的紧凑数据。`defineLevel()`（同一编译器的 TS 包装）供程序化组装 spec 使用，不进入目录聚合。
 - `architectureSpec.ts` 是 ISA 唯一权威：16 位指令 = Opcode[15:12] · Param[11:8] · Imm[7:0]，10 条指令；`architectureOracle` 是完整参考 CPU（三阶段状态机）；`architecturePrograms` 是第 44 关判题用的 10 个测试程序。
 - `architectureCircuits.ts` 用 `Builder` DSL（`gate/and/or/split/join/mux/reg/dff/component...`）生成 23 个可查看的教学组件（mux1–16、register1–16、adder8、alu、registers、pc、decode、phase、controller、datapath、fetch、memory、computer）与第 33–44 关参考电路。注意 `architectureLibrary()` 每次返回全新深拷贝，调用方可安全保存/修改自己的副本。
 - 编程关卡（45–56）复用第 44 关整机：`programmingMachine()` 生成清空 ROM 的固定电路，`programmingMachineLibrary()` 计算其依赖闭包；`validateProgrammingMachine()` 通过规范化 JSON 比对（`stable()` 排序键、忽略位置与 ROM 字）确保玩家不能篡改硬件绕过任务。旧存档导入时以固定库兜底合并（`storage.ts`），被篡改的同名固定组件会拒绝导入。
@@ -207,7 +205,7 @@ Worker 承担全部重活，主线程只做 UI：
 ## 10. 存档（storage.ts）
 
 - `Workspace`（version 6）：`{ currentLevel, circuits, proofs, inputs, library, workshop? }`，localStorage 键 `logic-workshop.v1`。证明（proofs）独立于草稿——修改草稿不影响通关进度，但旧证明只对当初的电路负责；`workshop` 是元件工坊草稿（levelId=0 哨兵，`parseWorkshopCircuit` 走自由接口校验）。
-- `parseWorkspace` 兼容 v1（4 关）→ v5（56 关）：逐关卡数上限校验、v5 以下合并固定机器库补齐第 45–56 关依赖；`parseGraph`/`parseCircuit`/`parseLibrary` 逐字段严格校验（含 `programSource` 必须与 `words` 汇编一致、原型链键名防护）；最后（默认）在 Worker 里逐关重跑 `judge` 重验证明，全部通过才一次性替换工作区。
+- `parseWorkspace` 兼容 v1（4 关）→ v6：v1–v4 按历史关卡上限严格校验、v5 以下合并固定机器库补齐第 45–56 关依赖；v5 起关卡目录随 JSON 增删变化，目录外的关卡键只丢弃对应数据而不让整个存档失效。`parseGraph`/`parseCircuit`/`parseLibrary` 逐字段严格校验（含 `programSource` 必须与 `words` 汇编一致、原型链键名防护）；最后（默认）在 Worker 里逐关重跑 `judge` 重验证明，全部通过才一次性替换工作区。
 - `serializeWorkspace` 输出确定性 JSON（先 `pruneDeletedComponents`），支持缩进参数供导出可读文件。
 - 主线程写入策略（App.tsx）：状态变化后 400ms 防抖保存；`pagehide` 时强制落盘；失败时状态条持续提示并建议导出备份。
 
@@ -240,7 +238,7 @@ Worker 承担全部重活，主线程只做 UI：
 ## 13. 测试体系
 
 ```bash
-npm test          # Vitest 单元测试（约 297 项）
+npm test          # Vitest 单元测试（约 300 项）
 npm run build     # tsc -b && vite build（类型检查 + 生产构建）
 npm run test:e2e  # Playwright 浏览器验收（约 36 项，需要 Chromium）
 ```
@@ -251,7 +249,7 @@ npm run test:e2e  # Playwright 浏览器验收（约 36 项，需要 Chromium）
 
 ## 14. 常见开发任务指引
 
-- **新增一关**：优先在 `content/levels/` 写一份 JSON（格式与示例见 [关卡编写指南](level-authoring.md)），`npm test` 会校验结构、关卡号与期望值快照；带状态的复杂参考机可在 TS 里用 `defineLevel()` 编写后加入 `levels.ts` 聚合数组。注意 `chapters` 划分与存档版本 `maximumSavedLevel` 的兼容策略。
+- **新增一关**：在 `content/levels/` 写一份 JSON（格式与示例见 [关卡编写指南](level-authoring.md)），`npm run regen:levels` 再生成后 `npm test` 会校验结构、关卡号、期望值与判题数据摘要快照。组合/时序/编程三种模式都由数据描述，无需改代码；注意 `chapters` 划分与存档的关卡目录兼容策略。
 - **修改指令集**：`architectureSpec.ts` 是唯一权威（`instructionSet`、`encode/decodeInstruction`、`architectureOracle`）；同时检查 `assembler.ts` 的助记符表、`ArchitecturePanel` 的展示、`architectureCircuits.ts` 的译码器/控制器门电路与参考程序。
 - **新增门类型**：`contracts.ts` 的 `GateType` → `model.ts getPorts/validateGraph` → `combinationalEvaluator` 指令集与掩码运算 → `simulator.ts compile()` 的 DigitalJS 映射 → `CircuitNode.tsx` 符号 → 各关卡 `allowed`。
 - **新增存储元件**：参照 DFF/RAM 的三处外置处理（`simulator.ts` 的编译与提交、`combinationalEvaluator` 的 storage、`netlist.hasCombinationalCycle` 的写端口豁免），并为两引擎补等价测试。

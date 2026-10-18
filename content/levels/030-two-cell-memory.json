@@ -1,0 +1,53 @@
+{
+  "id": 30,
+  "title": "两格存储器",
+  "caption": "地址选择独立状态",
+  "goal": "Addr 选择两格四位存储单元。沿上 W=1 写选中格；Q 始终组合读取当前地址，R 沿上清空两格。",
+  "formula": "沿上 M[Addr] ← D（W=1）；Q = M[Addr]",
+  "chapter": 5,
+  "inputs": [
+    [
+      "Addr",
+      1
+    ],
+    [
+      "D",
+      4
+    ],
+    [
+      "W",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Q",
+      4
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "每格需要一个独立四位寄存器。",
+    "写使能分别是 W∧¬Addr 与 W∧Addr。",
+    "两个单元共享 D、R；读取用 Addr 控制四位 MUX。"
+  ],
+  "rewardName": "Memory2x4",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

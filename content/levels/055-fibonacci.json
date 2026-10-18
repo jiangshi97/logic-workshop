@@ -1,0 +1,29 @@
+{
+  "id": 55,
+  "title": "斐波那契",
+  "caption": "迭代更新两个相邻状态",
+  "goal": "输出 F(n) mod 256，n 来自 RAM[240]，F(0)=0、F(1)=1。",
+  "formula": "F(n+2) = F(n+1) + F(n)",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["分别保存前一项、当前项和剩余轮数。","更新当前项之前，先保存其旧值供下一轮使用。","n=0 与 n=1 需要正确处理；F(14)=377，字节结果是121。"],
+  "program": {
+      "cases": [
+        {"id":"program-55-1","label":"RAM[240]=0","memory":{"240":0},"expectedOutput":[0],"maxCycles":12000},
+        {"id":"program-55-2","label":"RAM[240]=1","memory":{"240":1},"expectedOutput":[1],"maxCycles":12000},
+        {"id":"program-55-3","label":"RAM[240]=2","memory":{"240":2},"expectedOutput":[1],"maxCycles":12000},
+        {"id":"program-55-4","label":"RAM[240]=3","memory":{"240":3},"expectedOutput":[2],"maxCycles":12000},
+        {"id":"program-55-5","label":"RAM[240]=4","memory":{"240":4},"expectedOutput":[3],"maxCycles":12000},
+        {"id":"program-55-6","label":"RAM[240]=5","memory":{"240":5},"expectedOutput":[5],"maxCycles":12000},
+        {"id":"program-55-7","label":"RAM[240]=6","memory":{"240":6},"expectedOutput":[8],"maxCycles":12000},
+        {"id":"program-55-8","label":"RAM[240]=7","memory":{"240":7},"expectedOutput":[13],"maxCycles":12000},
+        {"id":"program-55-9","label":"RAM[240]=8","memory":{"240":8},"expectedOutput":[21],"maxCycles":12000},
+        {"id":"program-55-10","label":"RAM[240]=9","memory":{"240":9},"expectedOutput":[34],"maxCycles":12000},
+        {"id":"program-55-11","label":"RAM[240]=10","memory":{"240":10},"expectedOutput":[55],"maxCycles":12000},
+        {"id":"program-55-12","label":"RAM[240]=14","memory":{"240":14},"expectedOutput":[121],"maxCycles":12000}
+      ],
+      "referenceSource": "; 244=前一项，245=当前项，246=剩余轮数\nLOAD 240\nJZ zero\nMOVI B, 1\nSUB\nSTORE 246\nMOVI A, 0\nSTORE 244\nMOVI A, 1\nSTORE 245\nouter: LOAD 246\nJZ done\nSUB\nSTORE 246\nLOAD 245\nSTORE 247\ninner: LOAD 244\nJZ next\nSUB\nSTORE 244\nLOAD 245\nADD\nSTORE 245\nJMP inner\nnext: LOAD 247\nSTORE 244\nJMP outer\ndone: LOAD 245\nOUT\nHLT\nzero: OUT\nHLT"
+  }
+}

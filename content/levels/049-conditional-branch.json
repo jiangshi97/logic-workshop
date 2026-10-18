@@ -1,0 +1,31 @@
+{
+  "id": 49,
+  "title": "条件分支",
+  "caption": "用零标志决定路径",
+  "goal": "输入 RAM[240] 为零时输出 0，其余字节输出 1，然后停止。",
+  "formula": "OUT = (n = 0 ? 0 : 1)",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["LOAD 与 MOVI A 会更新 Z。","JZ label 只在 Z=1 时跳转。","两个分支最终都需要恰好一次 OUT 和正常停止。"],
+  "program": {
+      "cases": [
+        {"id":"program-49-1","label":"RAM[240]=0","memory":{"240":0},"expectedOutput":[0],"maxCycles":90},
+        {"id":"program-49-2","label":"RAM[240]=1","memory":{"240":1},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-3","label":"RAM[240]=2","memory":{"240":2},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-4","label":"RAM[240]=3","memory":{"240":3},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-5","label":"RAM[240]=7","memory":{"240":7},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-6","label":"RAM[240]=8","memory":{"240":8},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-7","label":"RAM[240]=15","memory":{"240":15},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-8","label":"RAM[240]=16","memory":{"240":16},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-9","label":"RAM[240]=85","memory":{"240":85},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-10","label":"RAM[240]=86","memory":{"240":86},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-11","label":"RAM[240]=127","memory":{"240":127},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-12","label":"RAM[240]=128","memory":{"240":128},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-13","label":"RAM[240]=254","memory":{"240":254},"expectedOutput":[1],"maxCycles":90},
+        {"id":"program-49-14","label":"RAM[240]=255","memory":{"240":255},"expectedOutput":[1],"maxCycles":90}
+      ],
+      "referenceSource": "LOAD 240\nJZ zero\nMOVI A, 1\nzero: OUT\nHLT"
+  }
+}

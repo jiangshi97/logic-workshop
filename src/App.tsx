@@ -737,7 +737,7 @@ function Workshop() {
                 <button className="hint-button" disabled={hintCount === 3} onClick={() => setHints(h => ({ ...h, [current]: Math.min(3, (h[current] ?? 0) + 1) }))}><Lightbulb size={15} />{hintCount === 3 ? '提示已全部展开' : hintCount ? '下一条提示' : '展开提示'}<ChevronRight size={14} /></button>
               </div>
               <div className={`test-feedback ${resultCurrent && result?.passed ? 'passed' : resultCurrent && result ? 'not-passed' : ''}`} data-testid="test-feedback" aria-live="polite">
-                {resultCurrent && result ? result.passed ? <><CircleCheck size={23} /><strong>{testCount} / {testCount} {level.cases ? '测试集通过' : '全部通过'}</strong><p>{current === levels.length ? '编程应用阶段完成，全部56关已交付。可以导出你的作品。' : programming ? '程序通过公开测试，下一关已解锁。' : '电路正确，下一关已解锁。'}</p>
+                {resultCurrent && result ? result.passed ? <><CircleCheck size={23} /><strong>{testCount} / {testCount} {level.cases ? '测试集通过' : '全部通过'}</strong><p>{current === levels.length ? `全部 ${levels.length} 关已完成，可以导出你的作品。` : programming ? '程序通过公开测试，下一关已解锁。' : '电路正确，下一关已解锁。'}</p>
                   {!programming && <button className="secondary-button save-component-button" onClick={() => openPackage('whole')}><Package size={14} />保存为组件</button>}
                   {current < levels.length ? <button className="next-button" aria-label="下一关" onClick={() => changeLevel(current + 1)}>下一关<ArrowRight size={16} /></button>
                     : <button className="next-button" onClick={exportSave}>导出我的作品<Download size={15} /></button>}</>

@@ -1,3 +1,4 @@
+import { levels } from '../src/levels';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createWorkspace, parseWorkspace, saveWorkspace } from '../src/storage';
 import { architectureLibrary } from '../src/architectureCircuits';
@@ -17,7 +18,7 @@ function legacy(version: number) {
 it('starts v5 with twelve complete fixed CPUs, empty ROMs and enabled inputs', () => {
   const workspace = createWorkspace();
   expect(workspace.version).toBe(6);
-  expect(Object.keys(workspace.circuits)).toHaveLength(56);
+  expect(Object.keys(workspace.circuits)).toHaveLength(levels.length);
   for (let id = 45; id <= 56; id++) {
     expect(workspace.circuits[id].nodes.find(n => n.type === 'ROM')?.words).toEqual([]);
     expect(workspace.circuits[id].wires.length).toBeGreaterThan(0);
@@ -30,7 +31,7 @@ it('starts v5 with twelve complete fixed CPUs, empty ROMs and enabled inputs', (
 it.each([1, 2, 3, 4])('adds complete programming drafts and dependencies when migrating v%i', version => {
   const raw = legacy(version), restored = parseWorkspace(JSON.stringify(raw), { verifyProofs: false });
   expect(restored.version).toBe(6);
-  expect(Object.keys(restored.circuits)).toHaveLength(56);
+  expect(Object.keys(restored.circuits)).toHaveLength(levels.length);
   expect(restored.circuits[1]).toEqual(raw.circuits[1]);
   expect(parseWorkspace(JSON.stringify(restored), { verifyProofs: false })).toEqual(restored);
   expect(restored.circuits[45].nodes.find(n => n.type === 'ROM')?.words).toEqual([]);

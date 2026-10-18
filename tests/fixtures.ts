@@ -2,7 +2,7 @@ import type { Circuit, GateType } from '../src/contracts';
 import { getLevel } from '../src/levels';
 import { sequentialReferenceCircuit } from './sequential-fixtures';
 import { architectureReferenceCircuit } from '../src/architectureCircuits';
-import { programmingReferenceCircuit } from '../src/programmingMachine';
+import { isProgrammingLevel, programmingReferenceCircuit } from '../src/programmingMachine';
 
 type Pin = { node: string; port: string };
 
@@ -68,9 +68,11 @@ class Builder {
 
 /** Test-only solutions composed from the tools available in each lesson. */
 export function referenceCircuit(levelId: number): Circuit {
-  if (levelId >= 45) return programmingReferenceCircuit(levelId);
-  if (levelId >= 33) return architectureReferenceCircuit(levelId);
-  if (levelId > 20) return sequentialReferenceCircuit(levelId);
+  // 按关卡数据分派而非编号区间：JSON 追加的 57+ 普通关不会误入固定机器/架构参考电路。
+  if (isProgrammingLevel(levelId)) return programmingReferenceCircuit(levelId);
+  const chapter = getLevel(levelId).chapter;
+  if (chapter === 6) return architectureReferenceCircuit(levelId);
+  if (chapter === 5 && levelId > 20) return sequentialReferenceCircuit(levelId);
   const b = new Builder(levelId);
   const a = b.input('A'), second = b.input('B'), s = b.input('S');
   switch (levelId) {
@@ -126,6 +128,12 @@ export function referenceCircuit(levelId: number): Circuit {
     case 20: {
       const adder = b.ripple(b.split(a, 4), b.split(second, 4).map(value => b.gate('NOT', value)), b.constant(1));
       b.output(adder.sum, 'Diff'); b.output(b.gate('NOT', adder.cout), 'Borrow');
+      break;
+    }
+    case 57: {
+      // JSON 追加关（测试关卡）：Diff 恒 0，Borrow = A + B（4 位截断）。
+      const adder = b.ripple(b.split(a, 4), b.split(second, 4), b.constant(0));
+      b.output(b.constant(0, 4), 'Diff'); b.output(adder.sum, 'Borrow');
       break;
     }
     default: throw new Error(`No reference circuit for lesson ${levelId}`);

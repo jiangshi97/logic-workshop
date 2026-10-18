@@ -1,0 +1,31 @@
+{
+  "id": 51,
+  "title": "常数乘法",
+  "caption": "把乘三展开为加法",
+  "goal": "输出 3×RAM[240] 的模 256 结果，然后停止。",
+  "formula": "OUT = 3n mod 256",
+  "chapter": 7,
+  "inputs": [["E",1],["R",1]],
+  "outputs": [["PC",8],["IR",16],["Phase",2],["A",8],["B",8],["Z",1],["Out",8],["Halt",1],["Fault",1],["Memory",8]],
+  "allowed": ["NAND","NOT","AND","OR","XOR","XNOR","SPLIT","JOIN","CONST","DFF","ROM","RAM"],
+  "hints": ["乘三可以理解为三份 n 的和。","每轮对累计结果加三，循环 n 次也是合法算法。","输入 86 时结果回绕到 2。"],
+  "program": {
+      "cases": [
+        {"id":"program-51-1","label":"RAM[240]=0","memory":{"240":0},"expectedOutput":[0],"maxCycles":130},
+        {"id":"program-51-2","label":"RAM[240]=1","memory":{"240":1},"expectedOutput":[3],"maxCycles":170},
+        {"id":"program-51-3","label":"RAM[240]=2","memory":{"240":2},"expectedOutput":[6],"maxCycles":210},
+        {"id":"program-51-4","label":"RAM[240]=3","memory":{"240":3},"expectedOutput":[9],"maxCycles":250},
+        {"id":"program-51-5","label":"RAM[240]=7","memory":{"240":7},"expectedOutput":[21],"maxCycles":410},
+        {"id":"program-51-6","label":"RAM[240]=8","memory":{"240":8},"expectedOutput":[24],"maxCycles":450},
+        {"id":"program-51-7","label":"RAM[240]=15","memory":{"240":15},"expectedOutput":[45],"maxCycles":730},
+        {"id":"program-51-8","label":"RAM[240]=16","memory":{"240":16},"expectedOutput":[48],"maxCycles":770},
+        {"id":"program-51-9","label":"RAM[240]=85","memory":{"240":85},"expectedOutput":[255],"maxCycles":3530},
+        {"id":"program-51-10","label":"RAM[240]=86","memory":{"240":86},"expectedOutput":[2],"maxCycles":3570},
+        {"id":"program-51-11","label":"RAM[240]=127","memory":{"240":127},"expectedOutput":[125],"maxCycles":5210},
+        {"id":"program-51-12","label":"RAM[240]=128","memory":{"240":128},"expectedOutput":[128],"maxCycles":5250},
+        {"id":"program-51-13","label":"RAM[240]=254","memory":{"240":254},"expectedOutput":[250],"maxCycles":10290},
+        {"id":"program-51-14","label":"RAM[240]=255","memory":{"240":255},"expectedOutput":[253],"maxCycles":10330}
+      ],
+      "referenceSource": "LOAD 240\nSTORE 244\nMOVI A, 0\nSTORE 245\nMOVI B, 1\nloop: LOAD 244\nJZ done\nSUB\nSTORE 244\nLOAD 245\nADD\nADD\nADD\nSTORE 245\nJMP loop\ndone: LOAD 245\nOUT\nHLT"
+  }
+}

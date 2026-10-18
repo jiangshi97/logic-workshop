@@ -1,0 +1,61 @@
+{
+  "id": 32,
+  "title": "存储与数据通路",
+  "caption": "沿上读取旧数据",
+  "goal": "Memory 组合读取当前格。沿上 Read=1 时 Out 保存沿前旧 Memory；同沿 W=1 可写新数据，但 Out 捕获旧值。R 优先清空全部状态。",
+  "formula": "沿上 Out ← 旧 M[Addr]（Read=1）；M[Addr] ← D（W=1）",
+  "chapter": 5,
+  "inputs": [
+    [
+      "Addr",
+      2
+    ],
+    [
+      "D",
+      4
+    ],
+    [
+      "W",
+      1
+    ],
+    [
+      "Read",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Memory",
+      4
+    ],
+    [
+      "Out",
+      4
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "Memory 是当前地址对应的组合输出。",
+    "给 Memory 后面再接一个由 Read 控制的寄存器。",
+    "所有寄存器共享时钟与 R；同一沿读写时 Out 得到写入前的值。"
+  ],
+  "rewardName": "MemoryDatapath4",
+  "sequential": {
+    "generator": "temporal"
+  }
+}

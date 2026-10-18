@@ -1,0 +1,57 @@
+{
+  "id": 35,
+  "title": "双寄存器组",
+  "caption": "同一条数据总线，两份独立状态",
+  "goal": "沿上 WA 写 A，WB 写 B，可同时写入 D；R 沿上优先清零两个寄存器。",
+  "formula": "沿上 A←WA?D:A；B←WB?D:B；R 优先",
+  "chapter": 6,
+  "inputs": [
+    [
+      "D",
+      8
+    ],
+    [
+      "WA",
+      1
+    ],
+    [
+      "WB",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "A",
+      8
+    ],
+    [
+      "B",
+      8
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "复用两个八位使能寄存器。",
+    "两个寄存器共享 D 和 R，分别接 WA 与 WB。",
+    "两路使能独立，任何一路保持时都需要选择自己的旧值。"
+  ],
+  "rewardName": "RegisterPair8",
+  "sequential": {
+    "generator": "architecture"
+  }
+}

@@ -1,3 +1,4 @@
+import { levels } from '../src/levels';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createWorkspace, parseWorkspace, saveWorkspace, STORAGE_KEY } from '../src/storage';
 import { connect, createCircuit } from '../src/model';
@@ -31,7 +32,7 @@ it('migrates v2 drafts, inputs, proofs and component versions while adding thirt
   expect(restored.inputs[12]).toEqual({ A: 15, B: 9, S: 0 });
   expect(restored.library).toMatchObject(legacy.library);
   expect(restored.library['outer@1'].dependencies).toEqual(['leaf@1']);
-  expect(Object.keys(restored.circuits)).toHaveLength(56);
+  expect(Object.keys(restored.circuits)).toHaveLength(levels.length);
   expect(restored.circuits[24].wires).toEqual([]);
 });
 

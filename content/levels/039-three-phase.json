@@ -1,0 +1,54 @@
+{
+  "id": 39,
+  "title": "三阶段时序",
+  "caption": "取指、译码、执行",
+  "goal": "使能沿上 Phase 按 0→1→2→0 循环。Stop 或 E=0 保持；R 优先清零；Phase=2 时 Execute=1。",
+  "formula": "沿上 Phase←R?0:(E∧¬Stop)?(Phase+1) mod 3:Phase",
+  "chapter": 6,
+  "inputs": [
+    [
+      "E",
+      1
+    ],
+    [
+      "Stop",
+      1
+    ],
+    [
+      "R",
+      1
+    ]
+  ],
+  "outputs": [
+    [
+      "Phase",
+      2
+    ],
+    [
+      "Execute",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF",
+    "ROM"
+  ],
+  "hints": [
+    "两位状态足够表示三个阶段，状态3不参与正常循环。",
+    "从当前阶段译码出下一阶段。",
+    "E 与 NOT(Stop) 控制寄存器写入；Execute 直接检测 Phase 等于2。"
+  ],
+  "rewardName": "ThreePhaseClock",
+  "sequential": {
+    "generator": "architecture"
+  }
+}

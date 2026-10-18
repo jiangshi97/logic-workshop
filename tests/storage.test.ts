@@ -1,3 +1,4 @@
+import { levels } from '../src/levels';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createWorkspace, loadWorkspace, parseWorkspace } from '../src/storage';
 import { connect, createCircuit } from '../src/model';
@@ -25,7 +26,7 @@ it('reports local storage access failures without throwing', () => {
 it('creates all fifty-six drafts and the component library required by fixed CPUs', () => {
   const state = createWorkspace();
   expect(state.version).toBe(6);
-  expect(Object.keys(state.circuits)).toHaveLength(56);
+  expect(Object.keys(state.circuits)).toHaveLength(levels.length);
   expect(Object.keys(state.library).length).toBeGreaterThan(0);
 });
 
@@ -43,7 +44,7 @@ it('migrates the four-lesson format without losing progress', () => {
   expect(restored.currentLevel).toBe(2);
   expect(restored.proofs[1].wires).toHaveLength(1);
   expect(restored.inputs[1]).toEqual({ A: 1 });
-  expect(Object.keys(restored.circuits)).toHaveLength(56);
+  expect(Object.keys(restored.circuits)).toHaveLength(levels.length);
 });
 
 it('can structurally parse candidate proofs for asynchronous verification', () => {
@@ -85,4 +86,24 @@ it('keeps a valid pass proof independent of subsequent edits', () => {
   state.proofs[1] = connect(createCircuit(1), 'A', 'out', 'Y', 'in');
   state.currentLevel = 2;
   expect(parseWorkspace(JSON.stringify(state)).currentLevel).toBe(2);
+});
+
+it('drops level keys beyond the catalogue instead of invalidating a v6 save', () => {
+  const state = createWorkspace();
+  const proof = connect(createCircuit(1), 'A', 'out', 'Y', 'in');
+  const poisoned = { version: 6, currentLevel: 100,
+    circuits: { ...state.circuits, 100: state.circuits[1] },
+    proofs: { 1: proof, 100: proof }, inputs: { 1: { A: 1 }, 100: { A: 1 } }, library: state.library };
+  const restored = parseWorkspace(JSON.stringify(poisoned), { verifyProofs: false });
+  expect(restored.circuits[57]).toBeDefined();
+  expect(restored.proofs[1]).toBeDefined();
+  expect(restored.proofs[100]).toBeUndefined();
+  expect(restored.inputs[100]).toBeUndefined();
+  expect(restored.currentLevel).toBe(levels.length);
+});
+
+it('still rejects malformed level keys in v6 saves', () => {
+  const state = createWorkspace();
+  expect(() => parseWorkspace(JSON.stringify({ ...state, proofs: { bogus: state.circuits[1] } })))
+    .toThrow('存档包含无效关卡编号。');
 });
