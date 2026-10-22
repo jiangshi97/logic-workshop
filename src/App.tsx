@@ -25,6 +25,8 @@ import { architectureLibrary } from './architectureCircuits';
 import { activeVariant, groupComponentFamilies } from './libraryGrouping';
 import { ProgrammingPanel } from './ProgrammingPanel';
 import { programmingCases } from './programmingSpec';
+import { machineByKey, machineKeyOf, machines } from './machines';
+import { assemble } from './assembler';
 import { WorkshopView } from './WorkshopView';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
@@ -56,6 +58,13 @@ function Workshop() {
   })), []);
   const inspectionLibrary = useMemo(() => ({ ...teachingLibrary, ...workspace.library }), [teachingLibrary, workspace.library]);
   const inputs = workspace.inputs[current];
+  // ---- 机器选择：编程关可在已通关关卡构建出的计算机之间切换；判定按当前草稿持有的机器执行 ----
+  const machineOptions = useMemo(() => machines
+    .filter(machine => workspace.proofs[machine.sourceLevel] !== undefined)
+    .map(machine => ({ key: machine.key, label: `${machine.name} · ${machine.instructions.length} 条指令` })),
+    [workspace.proofs]);
+  const activeMachineKey = useMemo(() => (programming ? machineKeyOf(circuit)?.key : undefined) ?? machineOptions[0]?.key ?? '',
+    [programming, circuit, machineOptions]);
   // ---- 编辑器状态：撤销历史、判题结果、连线/选择/提示/弹窗等 ----
   const [history, setHistory] = useState<Record<number, { past: Circuit[]; future: Circuit[] }>>({});
   const [result, setResult] = useState<TestResult | null>(null);
@@ -191,6 +200,23 @@ function Workshop() {
     setWorkspace(w => ({ ...w, circuits: { ...w.circuits, [current]: next } }));
     setPlaying(false); setPending(null);
   }, [circuit, current, cancelTask, verifyingInitial]);
+
+  // 切换计算机：换用新机电路并尽量保留当前源码（指令集不兼容时保留文本、清空 ROM 待重新应用）。
+  const switchMachine = useCallback((key: string) => {
+    const machine = machineByKey(key);
+    const source = circuit.nodes.find(node => node.id === 'program')?.programSource;
+    let words: number[] | undefined, kept: string | undefined;
+    if (source !== undefined) {
+      try { words = assemble(source, machine).words; kept = source; } catch { /* 新机不支持现有指令 */ }
+    }
+    const seeded = machine.circuit(current);
+    commit({ ...seeded, revision: circuit.revision + 1,
+      nodes: seeded.nodes.map(node => node.id === 'program' ? { ...node, ...(kept !== undefined ? { words, programSource: kept } : {}) } : node) });
+    setFitEpoch(epoch => epoch + 1);
+    notify(kept !== undefined || source === undefined
+      ? `已切换到${machine.name}。`
+      : `已切换到${machine.name}；原源码无法在该机汇编，ROM 已清空，请修改后重新应用。`);
+  }, [circuit, commit, current, notify]);
 
   const applyInputs = useCallback((next: Inputs) => {
     setObservedStep(null);
@@ -662,7 +688,8 @@ function Workshop() {
             onApply={(words, programSource) => { commit({ ...circuit, revision: circuit.revision + 1, nodes: circuit.nodes.map(node => node.id === 'program' ? { ...node, words, programSource } : node) }); setFitEpoch(epoch => epoch + 1); notify('汇编已应用，当前用例已重新载入。'); }}
             onStep={() => { setPlaying(false); setObservedStep(null); simulation.programStep(true); }} onCycle={() => { setPlaying(false); step(); }} onRun={toggleRun}
             onRestart={() => { setPlaying(false); setObservedStep(null); simulation.reset(); }} onCase={caseId => { setPlaying(false); setObservedStep(null); applyInputs({ E: 1, R: 0 }); simulation.programCase(caseId); }} onReplay={replayProgram}
-            machineVisible={machineVisible} onMachineView={() => setMachineVisible(visible => !visible)} />}
+            machineVisible={machineVisible} onMachineView={() => setMachineVisible(visible => !visible)}
+            machineKey={activeMachineKey} machineOptions={machineOptions} onMachineChange={switchMachine} />}
           <div className={`board ${programming && !machineVisible ? 'programming-machine-hidden' : ''}`} ref={boardElement}>
             {programming && machineVisible ? <div className="machine-preview"><CircuitPreview graph={circuit} library={inspectionLibrary} signals={{ values: { ...simulation.values, ...inputs }, portValues: simulation.portValues, wires: simulation.wires }} /></div> : <ReactFlow<FlowNode, FlowEdge> nodes={flowNodes} edges={flowEdges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
               nodesConnectable={!programming}

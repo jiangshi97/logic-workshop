@@ -3,7 +3,7 @@
 import { getLevel } from './levels';
 import { createId } from './id';
 import { hasCombinationalCycle } from './netlist';
-import { isProgrammingLevel, programmingMachine, validateProgrammingMachine } from './programmingMachine';
+import { isProgrammingLevel, machineForLevel, machineKeyOf, validateProgrammingMachine } from './machines';
 import { gateTypes } from './gates';
 import type { Circuit, CircuitGraph, CircuitNode, ComponentLibrary, GateType, NodeType, Port } from './contracts';
 export type { Circuit, CircuitGraph, CircuitNode, Wire, NodeType } from './contracts';
@@ -30,9 +30,9 @@ export function ports(type: NodeType) {
   const typed = getPorts({ id:'',type,label:'',position:{x:0,y:0} });
   return { inputs:typed.inputs.map(port=>port.id), outputs:typed.outputs.map(port=>port.id) };
 }
-/** 生成一关的初始电路：固定 INPUT/OUTPUT 端口；编程关卡返回固定 CPU；第 38/44 关额外带 ROM 节点（id 固定为 program）。 */
+/** 生成一关的初始电路：固定 INPUT/OUTPUT 端口；编程关卡返回关卡绑定的机器（ROM 清空）；第 38/44 关额外带 ROM 节点（id 固定为 program）。 */
 export function createCircuit(levelId: number): Circuit {
-  if(isProgrammingLevel(levelId))return programmingMachine(levelId);
+  if(isProgrammingLevel(levelId))return machineForLevel(levelId).circuit(levelId);
   const level = getLevel(levelId);
   return { levelId,revision:0,wires:[],nodes:[
     ...level.inputPorts.map((port,i)=>({id:port.id,label:port.id,type:'INPUT' as const,bits:port.bits,position:{x:90,y:level.inputPorts.length===1?190:90+i*145}})),
@@ -130,7 +130,9 @@ export function validateCircuit(circuit: Circuit, library: ComponentLibrary = {}
   try { level=getLevel(circuit.levelId); } catch { return [...errors,'关卡不存在。']; }
   errors.push(...validateGraph(circuit,library));
   if(!errors.length)errors.push(...validateProgrammingMachine(circuit,library));
-  const fixed=createCircuit(circuit.levelId).nodes;
+  // 固定端口以草稿实际持有的机器为准（多机选择时不同机器的接口可以不同），无匹配时回退关卡绑定机器。
+  const matched=isProgrammingLevel(circuit.levelId)?machineKeyOf(circuit):undefined;
+  const fixed=(matched?matched.circuit(circuit.levelId):createCircuit(circuit.levelId)).nodes;
   for (const expected of fixed) {
     const actual=circuit.nodes.find(n=>n.id===expected.id);
     if (!actual||actual.type!==expected.type||actual.label!==expected.label||(actual.bits??1)!==expected.bits) errors.push(`固定端口 ${expected.id} 缺失或被修改。`);

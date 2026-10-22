@@ -34,7 +34,7 @@ it('migrates v3 to fifty-six drafts while preserving proofs and saved input valu
   legacy.proofs[1] = structuredClone(legacy.circuits[1]);
   legacy.inputs[24] = { D: 255, E: 1, R: 0 };
   const restored = parseWorkspace(JSON.stringify(legacy));
-  expect(restored.version).toBe(6);
+  expect(restored.version).toBe(7);
   expect(Object.keys(restored.circuits)).toHaveLength(levels.length);
   expect(restored.currentLevel).toBe(2);
   expect(restored.circuits[1]).toEqual(legacy.circuits[1]);
@@ -45,10 +45,11 @@ it('migrates v3 to fifty-six drafts while preserving proofs and saved input valu
   expect(restored.library).toEqual(createWorkspace().library);
 });
 
-it('rejects architecture entries under a v3 version instead of silently accepting them', () => {
+it('ignores architecture entries beyond the v3 historical cap and synthesizes the draft', () => {
   const legacy = legacy32();
   legacy.circuits[33] = legacy.circuits[1];
-  expect(() => parseWorkspace(JSON.stringify(legacy))).toThrow(/关卡/);
+  const restored = parseWorkspace(JSON.stringify(legacy), { verifyProofs: false });
+  expect(restored.circuits[33].wires).toEqual([]);
 });
 
 it('imports the historical v3 demonstration without rewriting its saved drafts', () => {
@@ -56,7 +57,7 @@ it('imports the historical v3 demonstration without rewriting its saved drafts',
   const original = JSON.parse(text);
   expect(original.version).toBe(3);
   const restored = parseWorkspace(text, { verifyProofs: false });
-  expect(restored.version).toBe(6);
+  expect(restored.version).toBe(7);
   expect(Object.keys(restored.circuits)).toHaveLength(levels.length);
   expect(restored.currentLevel).toBe(original.currentLevel);
   expect(restored.proofs).toEqual(original.proofs);
@@ -121,13 +122,14 @@ it('saves graph structure without node runtime fields or programs on non-ROM nod
   raw.circuits[1].nodes[0].words = [123];
   raw.circuits[1].nodes[0].runtimeValue = 1;
   raw.circuits[1].state = { cycle: 18, memories: { ram: [255] } };
+  raw.state = { cycle: 19 };
   let saved = '';
   vi.stubGlobal('localStorage', { setItem: (_key: string, text: string) => { saved = text; } });
   saveWorkspace(raw);
   const restored = JSON.parse(saved);
-  expect(restored.circuits[1]).not.toHaveProperty('state');
-  expect(restored.circuits[1].nodes[0]).not.toHaveProperty('words');
-  expect(restored.circuits[1].nodes[0]).not.toHaveProperty('runtimeValue');
+  // 稀疏序列化：非 ROM 节点上的 words 与一切运行时字段不影响存档内容，未动过的草稿整条不入档。
+  expect(restored).not.toHaveProperty('state');
+  expect(Object.keys(restored.circuits)).toEqual([]);
 });
 
 it.each([8, 4, 1])('rejects a ROM stored at %i bits', bits => {

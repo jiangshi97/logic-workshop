@@ -51,6 +51,9 @@ export interface ProgramCaseSpec {
 export interface ProgramSpec {
   cases: ProgramCaseSpec[];
   referenceSource?: string;
+  /** 绑定的目标计算机（machines.ts 注册表键，如 "computer-44"）；缺省取注册表第一台。
+   *  这里只校验字符串形状，注册表解析在 machineForLevel 中进行。 */
+  machine?: string;
 }
 export interface LevelSpec {
   id: number;
@@ -229,6 +232,8 @@ function validateProgram(id: number, section: unknown): ProgramSpec {
   });
   if (spec.referenceSource !== undefined && (typeof spec.referenceSource !== 'string' || spec.referenceSource.length > 32000))
     fail(id, 'referenceSource 必须是不超过 32000 字符的字符串。');
+  if (spec.machine !== undefined && (typeof spec.machine !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(spec.machine)))
+    fail(id, 'program.machine 必须是形如 computer-44 的注册表键。');
   return spec;
 }
 
@@ -351,6 +356,7 @@ export function compileLevelSpec(input: unknown): Level {
     inputs: inputPorts.map(p => p.id), inputPorts, outputPorts, allowed,
     hints: [...spec.hints], rewardName: spec.rewardName,
     ...(spec.defaultProgram ? { defaultProgram: [...spec.defaultProgram] } : {}),
+    ...(spec.program?.machine ? { machine: spec.program.machine } : {}),
     expectedOutputs,
     ...(mode ? { mode } : {}),
     ...(scenarios ? { sequences } : {}),

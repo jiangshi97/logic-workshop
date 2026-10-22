@@ -1,17 +1,20 @@
-// 版本化存档：Workspace 的创建、严格解析（v1–v5 迁移与防篡改）、证明重验与确定性序列化。
+// 版本化存档：Workspace 的创建、宽容解析（v1–v7 全兼容迁移）、证明重验与确定性稀疏序列化。
 // 证明（proofs）独立于草稿电路：修改草稿不影响通关进度；导入时逐关重跑 judge 后才整体替换工作区。
+// v7 设计要点：①关卡草稿稀疏存储，缺失的关卡按目录合成，任何未知/目录外关卡键只忽略不再拒档；
+// ②组件库只保存玩家组件——规范机器依赖（architecture-*）载入时由代码重建并覆盖同名条目，
+// 机库随 ISA/架构演进不再影响旧档，也杜绝了篡改规范组件的入口；③证明链照旧逐关重验，失败只降级进度。
 import { createCircuit, validateCircuit, validateLibrary, validateWorkshopCircuit } from './model';
 import { levels } from './levels';
 import { judge } from './simulator';
 import { assemble } from './assembler';
-import { programmingMachine, programmingMachineLibrary } from './programmingMachine';
+import { canonicalMachineLibrary, isProgrammingLevel, machineKeyOf, programmingMachine } from './machines';
 import { pruneDeletedComponents } from './componentManagement';
 import type { Circuit, CircuitGraph, CircuitNode, ComponentDefinition, ComponentLibrary, Inputs, NodeType, Port, Wire } from './contracts';
 
 export const STORAGE_KEY = 'logic-workshop.v1';
-/** 存档结构（version 6）：全部关卡草稿、通关证明、每关输入值、完整组件库与可选的元件工坊草稿（levelId=0）。 */
+/** 存档结构（version 7）：稀疏关卡草稿、通关证明、每关输入值、玩家组件库与可选的元件工坊草稿（levelId=0）。 */
 export interface Workspace {
-  version: 6;
+  version: 7;
   currentLevel: number;
   circuits: Record<number, Circuit>;
   proofs: Record<number, Circuit>;
@@ -21,7 +24,7 @@ export interface Workspace {
 }
 
 export function createWorkspace(): Workspace {
-  return { version: 6, currentLevel: 1, proofs: {}, library: programmingMachineLibrary(),
+  return { version: 7, currentLevel: 1, proofs: {}, library: canonicalMachineLibrary(),
     circuits: Object.fromEntries(levels.map(level => [level.id, level.mode === 'program' ? programmingMachine(level.id) : createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, level.mode === 'program' && name === 'E' ? 1 : 0]))])) };
 }
@@ -100,6 +103,12 @@ function parseCircuit(raw: unknown, levelId: number, library: ComponentLibrary):
   const circuit: Circuit = { levelId, revision: value.revision as number, ...parseGraph(value) };
   const errors = validateCircuit(circuit, library);
   if (errors.length) throw new Error(errors[0]);
+  // 图结构校验已确认草稿与某台注册机器等价；这里再确认汇编源只使用该机支持的指令子集。
+  const machine = machineKeyOf(circuit);
+  const source = machine && circuit.nodes.find(node => node.id === 'program')?.programSource;
+  if (machine && source !== undefined) {
+    try { assemble(source, machine); } catch (error) { throw new Error((error as Error).message); }
+  }
   return circuit;
 }
 
@@ -156,40 +165,45 @@ function parseLibrary(raw: unknown): ComponentLibrary {
 }
 
 /**
- * 解析完整存档文本。v1–v5 老存档迁移：合并固定机器库补齐第 45–56 关依赖（同名被篡改的固定组件会在此暴露）；
- * v6 起额外携带可选的元件工坊草稿。默认逐关重跑 judge 重验证明，全部通过才返回；verifyProofs:false 供测试跳过。
+ * 解析完整存档文本，v1–v6 老档全部宽容迁移到 v7：缺失草稿按目录合成、规范机库由代码重建
+ * （存档中的 architecture-* 条目一律丢弃，防篡改也免迁移）、目录外/非数字关卡键只忽略不拒档。
+ * 默认逐关重跑 judge 重验证明，全部通过才返回；verifyProofs:false 供测试跳过。
  */
 export function parseWorkspace(text: string, options: { verifyProofs?: boolean } = {}): Workspace {
   if (text.length > 4_000_000) throw new Error('存档超过 4 MB 限制。');
   const raw = record(JSON.parse(text), '这不是兼容的逻辑工坊存档。');
-  if (![1, 2, 3, 4, 5, 6].includes(raw.version as number)) throw new Error('这不是兼容的逻辑工坊存档。');
+  if (typeof raw.version !== 'number' || !Number.isInteger(raw.version) || raw.version < 1 || raw.version > 7) {
+    throw new Error(typeof raw.version === 'number' && raw.version > 7 ? '存档来自更新版本的应用，请先升级再导入。' : '这不是兼容的逻辑工坊存档。');
+  }
   const circuits = record(raw.circuits, '存档缺少电路。');
   const proofs = raw.proofs === undefined ? {} : record(raw.proofs, '通关记录格式无效。');
   const inputs = raw.inputs === undefined ? {} : record(raw.inputs, '输入状态格式无效。');
   const workspace = createWorkspace();
-  const savedLibrary = raw.version === 1 ? {} : record(raw.library, '组件库格式无效。');
-  // New fixed drafts require canonical CPU dependencies. Preserve every saved version,
-  // including same-key definitions; fixed-machine validation diagnoses conflicts.
-  workspace.library = parseLibrary((raw.version as number) >= 5 ? savedLibrary : { ...programmingMachineLibrary(), ...savedLibrary });
-  const maximumSavedLevel = raw.version === 1 ? 4 : raw.version === 2 ? 20 : raw.version === 3 ? 32 : raw.version === 4 ? 44 : levels.at(-1)!.id;
-  // v1–v4 老档沿用历史严格上限；v5 起关卡目录会随 JSON 追加/删改变化，目录外的关卡键
-  // （实验关卡编号或更新版本写出的存档）只是不再被读取，不能因此让整个存档失效。
-  const strictLevelCap = (raw.version as number) <= 4;
-  const checkLevelKeys = (value: Record<string, unknown>) => {
-    if (Object.keys(value).some(key => !/^[1-9][0-9]*$/.test(key) || (strictLevelCap && Number(key) > maximumSavedLevel))) {
-      throw new Error('存档包含无效关卡编号。');
+  // 组件库：规范库内的条目一律丢弃、由代码重建（防篡改也免迁移）；代码已不认识的旧键
+  // （如更名前的 architecture-mux1@2）视同玩家组件保留，否则旧档里引用它的草稿会失效。
+  const savedLibrary = raw.version === 1 || raw.library === undefined ? {} : record(raw.library, '组件库格式无效。');
+  const canonical = canonicalMachineLibrary();
+  const playerOnly = Object.fromEntries(Object.entries(savedLibrary).filter(([key]) => !canonical[key]));
+  workspace.library = parseLibrary({ ...canonical, ...playerOnly });
+  // 稀疏读取：只接受目录内、且不超出该版本历史上限（v1–4 分别只到 4/20/32/44 关）的关卡键；
+  // 目录外、非数字与超上限的键一概忽略（实验关卡编号或更新版本写出的数据），不再让整档失效。
+  const historicalCap = [Infinity, 4, 20, 32, 44, Infinity, Infinity, Infinity][raw.version as number];
+  const catalogue = new Set(levels.map(level => level.id));
+  const collect = (value: Record<string, unknown>): Record<number, unknown> => {
+    const picked: Record<number, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (!/^[1-9][0-9]*$/.test(key)) continue;
+      const id = Number(key);
+      if (catalogue.has(id) && id <= historicalCap) picked[id] = entry;
     }
+    return picked;
   };
-  checkLevelKeys(circuits); checkLevelKeys(proofs); checkLevelKeys(inputs);
+  const savedCircuits = collect(circuits), savedProofs = collect(proofs), savedInputs = collect(inputs);
   for (const level of levels) {
-    if (level.id <= maximumSavedLevel) workspace.circuits[level.id] = parseCircuit(circuits[level.id], level.id, workspace.library);
-    else if (level.mode === 'program') {
-      const errors = validateCircuit(workspace.circuits[level.id], workspace.library);
-      if (errors.length) throw new Error(errors[0]);
-    }
-    if (proofs[level.id] !== undefined) workspace.proofs[level.id] = parseCircuit(proofs[level.id], level.id, workspace.library);
-    if (inputs[level.id] !== undefined) {
-      const values = record(inputs[level.id], '输入状态格式无效。');
+    if (savedCircuits[level.id] !== undefined) workspace.circuits[level.id] = parseCircuit(savedCircuits[level.id], level.id, workspace.library);
+    if (savedProofs[level.id] !== undefined) workspace.proofs[level.id] = parseCircuit(savedProofs[level.id], level.id, workspace.library);
+    if (savedInputs[level.id] !== undefined) {
+      const values = record(savedInputs[level.id], '输入状态格式无效。');
       if (Object.keys(values).some(name => !level.inputs.includes(name))) throw new Error('输入端口无效。');
       for (const port of level.inputPorts) {
         const value = values[port.id];
@@ -229,7 +243,8 @@ export function loadWorkspace(): { workspace: Workspace; savedText?: string; err
   }
 }
 
-/** 序列化为确定性 JSON（先清理不可达的已删除组件）；space 供导出可读文件。 */
+/** 序列化为确定性 JSON：先清理不可达的已删除组件；与初始草稿完全一致的关卡省略
+ *  （读取时按目录合成还原，round-trip 相等），规范机库组件不写入；space 供导出可读文件。 */
 export function serializeWorkspace(workspace: Workspace, space?: number) {
   workspace = pruneDeletedComponents(workspace);
   const graph = (value: CircuitGraph): CircuitGraph => ({
@@ -242,15 +257,25 @@ export function serializeWorkspace(workspace: Workspace, space?: number) {
     })),
     wires: value.wires.map(({ id, source, target, sourceHandle, targetHandle }) => ({ id, source, target, sourceHandle, targetHandle })),
   });
+  const seedOf = (levelId: number): Circuit => isProgrammingLevel(levelId) ? programmingMachine(levelId) : createCircuit(levelId);
+  const untouched = (circuit: Circuit): boolean => {
+    const seed = seedOf(circuit.levelId);
+    return circuit.revision === seed.revision && JSON.stringify(graph(circuit)) === JSON.stringify(graph(seed));
+  };
   const circuits = (records: Record<number, Circuit>) => Object.fromEntries(Object.entries(records)
+    .filter(([, circuit]) => !untouched(circuit))
     .map(([id, circuit]) => [id, { levelId: circuit.levelId, revision: circuit.revision, ...graph(circuit) }]));
   const ports = (records: Port[]) => records.map(({ id, label, bits }) => ({ id, label, bits }));
-  const library = Object.fromEntries(Object.entries(workspace.library).map(([key, definition]) => [key, {
-    id: definition.id, version: definition.version, name: definition.name,
-    inputs: ports(definition.inputs), outputs: ports(definition.outputs), dependencies: [...definition.dependencies],
-    ...(definition.sourceLevel === undefined ? {} : { sourceLevel: definition.sourceLevel }),
-    ...(definition.deleted ? { deleted: true } : {}), graph: graph(definition.graph),
-  }]));
+  const canonical = canonicalMachineLibrary();
+  // 与解析对称：规范库内的条目不写入（载入时由代码重建）；代码不认识的旧规范键仍需落档供旧草稿引用。
+  const library = Object.fromEntries(Object.entries(workspace.library)
+    .filter(([key]) => !canonical[key])
+    .map(([key, definition]) => [key, {
+      id: definition.id, version: definition.version, name: definition.name,
+      inputs: ports(definition.inputs), outputs: ports(definition.outputs), dependencies: [...definition.dependencies],
+      ...(definition.sourceLevel === undefined ? {} : { sourceLevel: definition.sourceLevel }),
+      ...(definition.deleted ? { deleted: true } : {}), graph: graph(definition.graph),
+    }]));
   return JSON.stringify({ version: workspace.version, currentLevel: workspace.currentLevel,
     circuits: circuits(workspace.circuits), proofs: circuits(workspace.proofs), inputs: workspace.inputs, library,
     ...(workspace.workshop ? { workshop: { levelId: 0, revision: workspace.workshop.revision, ...graph(workspace.workshop) } } : {}),

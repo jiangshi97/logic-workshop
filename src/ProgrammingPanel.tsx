@@ -15,7 +15,7 @@ function sourceOf(node: CircuitNode): string {
 }
 const stopNames: Record<string, string> = { halt: '程序已停止', fault: '非法指令，程序已停止', breakpoint: '断点已命中', budget: '超过周期预算，运行已暂停', paused: 'E=0，机器保持' };
 
-export function ProgrammingPanel({ levelId, node, simulation, result, busy, playing, inputs, onInputs, breakpoints, onBreakpoints, onApply, onDirty, onEditing, onStep, onCycle, onRun, onRestart, onCase, onReplay, machineVisible, onMachineView }: {
+export function ProgrammingPanel({ levelId, node, simulation, result, busy, playing, inputs, onInputs, breakpoints, onBreakpoints, onApply, onDirty, onEditing, onStep, onCycle, onRun, onRestart, onCase, onReplay, machineVisible, onMachineView, machineKey, machineOptions, onMachineChange }: {
   levelId: number; node: CircuitNode; simulation: Simulation & { pending: boolean }; result: TestResult | null;
   busy: boolean; playing: boolean; breakpoints: number[]; onBreakpoints: (values: number[]) => void;
   inputs: Inputs; onInputs: (values: Inputs) => void;
@@ -23,6 +23,7 @@ export function ProgrammingPanel({ levelId, node, simulation, result, busy, play
   onStep: () => void; onCycle: () => void; onRun: () => void; onRestart: () => void;
   onCase: (caseId: string) => void; onReplay: (row: TestRow) => void;
   machineVisible: boolean; onMachineView: () => void;
+  machineKey: string; machineOptions: { key: string; label: string }[]; onMachineChange: (key: string) => void;
 }) {
   const savedSource = sourceOf(node);
   const [source, setSource] = useState(savedSource);
@@ -51,6 +52,7 @@ export function ProgrammingPanel({ levelId, node, simulation, result, busy, play
   return <section className="programming-workbench" aria-label="编程工作台">
     <header className="programming-heading"><div><Code2 size={18} /><strong>汇编工作台</strong><span>8位CPU · 16位指令</span></div><button className="secondary-button" onClick={onMachineView}>{machineVisible ? '返回程序编辑' : '查看 CPU 电路'}</button></header>
     <div className="programming-debug-toolbar">
+      <label>计算机<select aria-label="选择计算机" data-testid="machine-select" value={machineKey} disabled={disabled || playing || machineOptions.length < 2} title="在之前关卡中构建的计算机之间切换" onChange={event => onMachineChange(event.target.value)}>{machineOptions.map(machine => <option key={machine.key} value={machine.key}>{machine.label}</option>)}</select></label>
       <label>输入用例<select aria-label="程序输入用例" value={currentCase.id} disabled={disabled || playing} onChange={event => { onCase(event.target.value); setCasesPage(Math.floor(cases.findIndex(item => item.id === event.target.value) / 8)); }}>{cases.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       <button className="secondary-button" aria-label="重启用例" disabled={disabled} onClick={onRestart}><RotateCcw size={14} />重启</button>
       <button className="secondary-button" aria-label="程序使能 E" aria-pressed={inputs.E === 1} disabled={disabled} onClick={() => onInputs({ ...inputs, E: inputs.E ? 0 : 1 })}>E={inputs.E}</button>

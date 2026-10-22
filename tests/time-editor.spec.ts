@@ -10,7 +10,7 @@ import { architectureLibrary } from '../src/architectureCircuits';
 test.setTimeout(120_000);
 const errors = new WeakMap<Page, string[]>();
 function stateAt(id: number): Workspace {
-  const state: Workspace = { version: 6, currentLevel: id, library: architectureLibrary(), proofs: {},
+  const state: Workspace = { version: 7, currentLevel: id, library: architectureLibrary(), proofs: {},
     circuits: Object.fromEntries(levels.map(level => [level.id, createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, 0]))])) };
   for (let level = 1; level <= 32; level++) {
@@ -79,7 +79,7 @@ test('builds a DFF in the editor; inputs hold, ticks capture, movement preserves
   await bit(page, 'D', true); await tick(page, 3); await expect(page.getByTestId('output-Q')).toHaveText('1');
   const exported = await exportState(page); await importState(page, exported);
   await expect(page.getByTestId('clock-cycle')).toContainText('周期 0'); await expect(page.getByTestId('output-Q')).toHaveText('0');
-  expect(exported.version).toBe(6);
+  expect(exported.version).toBe(7);
   await page.screenshot({ path: 'work/time-register-desktop.png' });
 });
 
@@ -172,7 +172,8 @@ test('nested stateful components keep their dependencies on export/import and wo
   await importState(page, state); await bit(page, 'D', true); await bit(page, 'E', true); await tick(page, 1);
   await expect(page.getByTestId('output-Q')).toHaveText('1');
   await page.getByRole('button', { name: '测试电路', exact: true }).click(); await expect(page.getByTestId('test-feedback')).toContainText('全部通过');
-  const exported = await exportState(page); expect(exported.library).toEqual(state.library);
+  const exported = await exportState(page);
+  expect(exported.library).toEqual(Object.fromEntries(Object.entries(state.library).filter(([key]) => key.startsWith('component-'))));
   await importState(page, exported); await expect(page.getByTestId('output-Q')).toHaveText('0'); await tick(page, 1); await expect(page.getByTestId('output-Q')).toHaveText('1');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: '波形记录', exact: true }).click(); await expect(page.getByTestId('timing-waveform')).toBeVisible();

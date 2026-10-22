@@ -8,7 +8,7 @@ import { referenceCircuit } from './fixtures';
 
 test.setTimeout(240_000);
 function stateAt(id: number): Workspace {
-  const state: Workspace = { version: 6, currentLevel: id, library: architectureLibrary(), proofs: {}, circuits: {}, inputs: {} };
+  const state: Workspace = { version: 7, currentLevel: id, library: architectureLibrary(), proofs: {}, circuits: {}, inputs: {} };
   for (const level of levels) {
     state.circuits[level.id] = referenceCircuit(level.id);
     state.inputs[level.id] = Object.fromEntries(level.inputs.map(p => [p, 0]));
@@ -66,11 +66,14 @@ test('a migrated stage-five save unlocks architecture and lets users place 16-bi
   await page.getByRole('button', { name: '关闭组件详情', exact: true }).click();
   await page.getByRole('button', { name: '添加教学组件 八位使能寄存器', exact: true }).click();
   const saved = await exported(page);
-  expect(saved.version).toBe(6);
-  expect(saved.library['architecture-register8@1'].dependencies).toContain('architecture-mux8@1');
-  expect(saved.library['architecture-mux8@1']).toBeDefined();
+  expect(saved.version).toBe(7);
+  expect(saved.circuits[33].nodes.filter(n => n.type === 'COMPONENT')).toHaveLength(1);
+  expect(Object.keys(saved.library).filter(key => key.startsWith('architecture-'))).toEqual([]);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
-  expect((await exported(page)).circuits[33].nodes.filter(n => n.type === 'COMPONENT')).toHaveLength(0);
+  // 撤销只回退教学组件的放置：16 位门仍在草稿里，稀疏存档继续落盘该关。
+  const undone = (await exported(page)).circuits[33];
+  expect(undone.nodes.filter(n => n.type === 'COMPONENT')).toHaveLength(0);
+  expect(undone.nodes.some(n => n.type === 'AND' && n.bits === 16)).toBe(true);
 });
 
 test('refreshes reused A and B handles when entering the register-pair lesson', async ({ page }) => {

@@ -17,10 +17,14 @@ export interface AssemblyResult {
 
 const opcodes: Record<string, number> = { NOP: 0, MOVI: 1, ADD: 2, SUB: 3, LOAD: 4, STORE: 5, JMP: 6, JZ: 7, OUT: 8, HLT: 9 };
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** 机器指令集的最小结构（machines.ts 的 MachineDescriptor 结构兼容；避免汇编器反向依赖注册表）。 */
+export interface InstructionFilter { name: string; instructions: readonly string[]; }
 function fail(line: number, message: string): never { throw new Error(`第 ${line} 行：${message}`); }
 
-/** Two passes resolve labels; no simulator or machine state participates. */
-export function assemble(source: string): AssemblyResult {
+/** Two passes resolve labels; no simulator or machine state participates.
+ * 传入 machine 时只接受该机支持的指令子集，越权指令带行号报错。 */
+export function assemble(source: string, machine?: InstructionFilter): AssemblyResult {
   if (source.length > 32000) fail(1, '源程序超过 32,000 字符。');
   const labels = new Map<string, number>();
   const instructions: { code: string; line: number; text: string }[] = [];
@@ -54,6 +58,7 @@ export function assemble(source: string): AssemblyResult {
     const name = match[1].toUpperCase();
     const opcode = opcodes[name];
     if (opcode === undefined) fail(line, `未知指令 ${name}。`);
+    if (machine && !machine.instructions.includes(name)) fail(line, `${machine.name}不支持指令 ${name}。`);
     const operand = match[2]?.trim() ?? '';
     let param = 0, imm = 0;
     if (name === 'MOVI') {
@@ -74,13 +79,17 @@ export function assemble(source: string): AssemblyResult {
   return { words: listing.map(row => row.word), listing, labels: Object.fromEntries(labels) };
 }
 
-/** 反汇编：用于把已保存的 ROM 字恢复成可编辑源码；遇到非法指令字则抛错。 */
-export function disassemble(words: number[]): string {
+/** 反汇编：用于把已保存的 ROM 字恢复成可编辑源码；遇到非法指令字则抛错。
+ *  传入 machine 时，超出该机指令集的字同样报错。 */
+export function disassemble(words: number[], machine?: InstructionFilter): string {
   if (words.length > 256) throw new Error('地址 256：程序最多容纳 256 个字。');
   return words.map((word, address) => {
     const decoded = decodeInstruction(word);
     if (!Number.isInteger(word) || word < 0 || word > 65535 || !decoded.valid) {
       throw new Error(`地址 ${address}：非法指令字 ${String(word)}。`);
+    }
+    if (machine && !machine.instructions.includes(decoded.name)) {
+      throw new Error(`地址 ${address}：指令字 ${String(word)} 超出${machine.name}支持的指令集。`);
     }
     if (decoded.opcode === 1) return `MOVI ${decoded.param === 1 ? 'B' : 'A'}, ${decoded.imm}`;
     if (decoded.opcode >= 4 && decoded.opcode <= 7) return `${decoded.name} ${decoded.imm}`;

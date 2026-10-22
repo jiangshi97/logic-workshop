@@ -17,7 +17,7 @@ function legacy(version: number) {
 
 it('starts v5 with twelve complete fixed CPUs, empty ROMs and enabled inputs', () => {
   const workspace = createWorkspace();
-  expect(workspace.version).toBe(6);
+  expect(workspace.version).toBe(7);
   expect(Object.keys(workspace.circuits)).toHaveLength(levels.length);
   for (let id = 45; id <= 56; id++) {
     expect(workspace.circuits[id].nodes.find(n => n.type === 'ROM')?.words).toEqual([]);
@@ -30,7 +30,7 @@ it('starts v5 with twelve complete fixed CPUs, empty ROMs and enabled inputs', (
 
 it.each([1, 2, 3, 4])('adds complete programming drafts and dependencies when migrating v%i', version => {
   const raw = legacy(version), restored = parseWorkspace(JSON.stringify(raw), { verifyProofs: false });
-  expect(restored.version).toBe(6);
+  expect(restored.version).toBe(7);
   expect(Object.keys(restored.circuits)).toHaveLength(levels.length);
   expect(restored.circuits[1]).toEqual(raw.circuits[1]);
   expect(parseWorkspace(JSON.stringify(restored), { verifyProofs: false })).toEqual(restored);
@@ -48,37 +48,47 @@ it('reverifies the continuous chain of forty-four old proofs after migration', (
   expect(Object.keys(parseWorkspace(JSON.stringify(raw)).proofs)).toHaveLength(20);
 }, 120_000);
 
-it('keeps v4 bounded at 44 even after curriculum expansion', () => {
+it('ignores v4 keys beyond the historical cap instead of rejecting the save', () => {
   const raw = legacy(4);
   raw.circuits[45] = raw.circuits[44];
-  expect(() => parseWorkspace(JSON.stringify(raw))).toThrow(/关卡/);
+  const restored = parseWorkspace(JSON.stringify(raw), { verifyProofs: false });
+  expect(restored.circuits[45].nodes.some(n => n.type === 'ROM')).toBe(true);
 });
 
-it('requires every v5 draft and refuses to repair a missing dependency silently', () => {
+it('synthesizes missing drafts and rebuilds canonical dependencies from code', () => {
   const raw = rawWorkspace();
   delete raw.circuits[56];
-  expect(() => parseWorkspace(JSON.stringify(raw))).toThrow();
+  const restored = parseWorkspace(JSON.stringify(raw), { verifyProofs: false });
+  expect(restored.circuits[56].nodes.some(n => n.type === 'ROM')).toBe(true);
   const missing = rawWorkspace();
   missing.library = {};
-  expect(() => parseWorkspace(JSON.stringify(missing))).toThrow(/依赖|组件|固定|机器/);
+  const repaired = parseWorkspace(JSON.stringify(missing), { verifyProofs: false });
+  expect(Object.keys(repaired.library).length).toBeGreaterThan(0);
+  expect(repaired.circuits[45].wires.length).toBeGreaterThan(0);
 });
 
-it('rejects altered CPU wiring and altered canonical dependency definitions', () => {
+it('rejects altered CPU wiring while tampered canonical definitions are replaced from code', () => {
   const raw = rawWorkspace();
   raw.circuits[45].wires.pop();
   expect(() => parseWorkspace(JSON.stringify(raw))).toThrow(/固定|机器|CPU/);
   const dependency = rawWorkspace();
   const definition = Object.values(dependency.library).find((d: any) => d.graph.nodes.some((n: any) => n.type === 'CONST')) as any;
+  const key = `${definition.id}@${definition.version}`;
   const node = definition.graph.nodes.find((n: any) => n.type === 'CONST');
-  node.value = node.value ? 0 : 1;
-  expect(() => parseWorkspace(JSON.stringify(dependency))).toThrow(/固定|机器|依赖|CPU/);
+  const original = node.value;
+  node.value = original ? 0 : 1;
+  const restored = parseWorkspace(JSON.stringify(dependency), { verifyProofs: false });
+  expect(restored.library[key].graph.nodes.find((n: any) => n.type === 'CONST')!.value).toBe(original);
 });
 
-it('rejects conflicting legacy canonical versions instead of overwriting them', () => {
+it('rebuilds tampered legacy canonical definitions from code instead of trusting the save', () => {
   const raw = legacy(4), definition = Object.values(raw.library).find((d: any) => d.graph.nodes.some((n: any) => n.type === 'CONST')) as any;
+  const key = `${definition.id}@${definition.version}`;
   const node = definition.graph.nodes.find((n: any) => n.type === 'CONST');
-  node.value = node.value ? 0 : 1;
-  expect(() => parseWorkspace(JSON.stringify(raw))).toThrow(/固定|机器|依赖|CPU/);
+  const original = node.value;
+  node.value = original ? 0 : 1;
+  const restored = parseWorkspace(JSON.stringify(raw), { verifyProofs: false });
+  expect(restored.library[key].graph.nodes.find((n: any) => n.type === 'CONST')!.value).toBe(original);
 });
 
 it('round-trips assembly source while excluding all debugger and runtime fields', () => {

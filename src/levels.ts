@@ -25,6 +25,8 @@ export interface Level {
   sequences?: () => TestSequence[];
   cases?: () => Inputs[];
   defaultProgram?: number[];
+  /** 编程关绑定的目标计算机（machines.ts 注册表键）；缺省取注册表第一台。 */
+  machine?: string;
 }
 
 export const chapters = ['信号与逻辑门', '选择与分配', '多位信号', '组合运算', '状态与时间', '计算机架构', '编程应用'];

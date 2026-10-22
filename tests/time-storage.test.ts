@@ -25,7 +25,7 @@ it('migrates v2 drafts, inputs, proofs and component versions while adding thirt
     circuits: Object.fromEntries(Object.entries(workspace.circuits).filter(([id]) => Number(id) <= 20)),
     inputs: Object.fromEntries(Object.entries(workspace.inputs).filter(([id]) => Number(id) <= 20)) };
   const restored = parseWorkspace(JSON.stringify(legacy));
-  expect(restored.version).toBe(6);
+  expect(restored.version).toBe(7);
   expect(restored.currentLevel).toBe(2);
   expect(restored.circuits[1]).toEqual(workspace.circuits[1]);
   expect(restored.proofs[1]).toEqual(workspace.proofs[1]);
@@ -53,13 +53,15 @@ it('keeps the legacy save key and excludes transient state from serialization an
   expect(restored).not.toHaveProperty('trace');
 });
 
-it('rejects out-of-range legacy level entries rather than treating v2 as v3', () => {
+it('ignores out-of-range legacy level entries instead of rejecting the v2 save', () => {
   const workspace = createWorkspace();
   const legacy = { ...workspace, version: 2,
     circuits: Object.fromEntries(Object.entries(workspace.circuits).filter(([id]) => Number(id) <= 20)),
     inputs: Object.fromEntries(Object.entries(workspace.inputs).filter(([id]) => Number(id) <= 20)),
     proofs: { 21: createCircuit(1) } };
-  expect(() => parseWorkspace(JSON.stringify(legacy))).toThrow(/关卡/);
+  const restored = parseWorkspace(JSON.stringify(legacy), { verifyProofs: false });
+  expect(restored.proofs[21]).toBeUndefined();
+  expect(restored.circuits[21]).toEqual(workspace.circuits[21]);
 });
 
 it('round-trips eight-bit DFF definitions and discards runtime fields from graph records', () => {

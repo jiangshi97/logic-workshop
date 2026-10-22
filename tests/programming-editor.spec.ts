@@ -24,7 +24,7 @@ async function exported(page: Page): Promise<Workspace> {
   return JSON.parse(await readFile(path, 'utf8'));
 }
 async function at(page: Page, id: number) {
-  const state: Workspace = { version: 6, currentLevel: id, library: architectureLibrary(), circuits: {}, proofs: {}, inputs: {} };
+  const state: Workspace = { version: 7, currentLevel: id, library: architectureLibrary(), circuits: {}, proofs: {}, inputs: {} };
   for (const level of levels) {
     state.circuits[level.id] = referenceCircuit(level.id);
     state.inputs[level.id] = Object.fromEntries(level.inputs.map(name => [name, level.mode === 'program' && name === 'E' ? 1 : 0]));
@@ -50,6 +50,11 @@ async function instruction(page: Page, cycle: number) {
 test('a completed architecture save opens the assembly workbench and applies a program atomically', async ({ page }) => {
   await migrated(page);
   await expect(page.getByRole('textbox', { name: '汇编源代码' })).toBeVisible();
+  // 机器选择器冒烟：当前只注册一台计算机（第 44 关），单选项时禁用但可见。
+  const machine = page.getByRole('combobox', { name: '选择计算机' });
+  await expect(machine).toBeVisible();
+  await expect(machine).toBeDisabled();
+  await expect(machine.locator('option')).toHaveText('第 44 关计算机 · 10 条指令');
   await page.getByRole('textbox', { name: '汇编源代码' }).fill('MOVI A, 42\nOUT\nHLT');
   await page.getByRole('button', { name: '应用汇编', exact: true }).click();
   await expect(page.getByTestId('clock-cycle')).toHaveText('周期 0');
@@ -112,8 +117,9 @@ test('case initialization, RAM writes, output history and source survive save wh
   await expect(page.getByTestId('ram-242')).toHaveText('255');
   await instruction(page, 9); await expect(page.getByTestId('program-output-events')).toHaveText('255');
   const saved = await exported(page);
-  expect(saved.version).toBe(6); expect(Object.keys(saved.circuits)).toHaveLength(57);
-  expect(saved.library['architecture-datapath@1']).toBeDefined();
+  expect(saved.version).toBe(7);
+  expect(saved.circuits[47].nodes.find(node => node.id === 'program')?.programSource).toBe(programmingReferenceSource(47));
+  expect(saved.library).toEqual({});
   expect(saved).not.toHaveProperty('program'); expect(saved).not.toHaveProperty('runtime'); expect(saved).not.toHaveProperty('breakpoints');
   await page.locator('input[type=file]').setInputFiles({ name: 'roundtrip.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)) });
   await expect(page.locator('.toast')).toContainText('存档已导入');
@@ -205,4 +211,16 @@ test('long programming tasks keep animation and pause responsive, including the 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'work/programming-mobile.png' });
   expect(errors).toEqual([]);
+});
+
+test('the migrated v5 save imports at full progress into the assembly workbench', async ({ page }) => {
+  const state = JSON.parse(await readFile('docs/migrated-save.json', 'utf8'));
+  expect(state.version).toBe(7);
+  await page.goto('/');
+  await page.locator('input[type=file]').setInputFiles({ name: 'migrated-v5.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state)) });
+  await expect(page.locator('.toast')).toContainText('存档已导入', { timeout: 180_000 });
+  await expect(page.getByTestId('progress-count')).toHaveText('56 / 57');
+  await expect(page.getByRole('textbox', { name: '汇编源代码' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '选择计算机' })).toBeDisabled();
+  await page.screenshot({ path: 'work/migrated-v5-workbench.png' });
 });

@@ -10,7 +10,7 @@ test('renames custom components and cascade-deletes dependents while retaining r
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 
-  const state: Workspace = { version: 6, currentLevel: 1, proofs: {}, library: architectureLibrary(),
+  const state: Workspace = { version: 7, currentLevel: 1, proofs: {}, library: architectureLibrary(),
     circuits: Object.fromEntries(levels.map(level => [level.id, createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, 0]))])) };
   const leaf = packageCircuit(connect(createCircuit(1), 'A', 'out', 'Y', 'in'), 'Leaf', state.library);
@@ -62,7 +62,7 @@ test('replaces a selected component from the toolbar while preserving its instan
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 
-  const state: Workspace = { version: 6, currentLevel: 1, proofs: {}, library: architectureLibrary(),
+  const state: Workspace = { version: 7, currentLevel: 1, proofs: {}, library: architectureLibrary(),
     circuits: Object.fromEntries(levels.map(level => [level.id, createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, 0]))])) };
   const source = packageCircuit(connect(createCircuit(1), 'A', 'out', 'Y', 'in'), 'Source', state.library);
@@ -93,7 +93,7 @@ test('keeps independent sidebar scroll positions when switching between levels a
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 
-  const state: Workspace = { version: 6, currentLevel: 1, proofs: {}, library: architectureLibrary(),
+  const state: Workspace = { version: 7, currentLevel: 1, proofs: {}, library: architectureLibrary(),
     circuits: Object.fromEntries(levels.map(level => [level.id, createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, 0]))])) };
   const source = connect(createCircuit(1), 'A', 'out', 'Y', 'in');

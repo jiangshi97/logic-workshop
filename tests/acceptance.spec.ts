@@ -11,7 +11,7 @@ test.setTimeout(90_000);
 const browserErrors = new WeakMap<Page, string[]>();
 
 function completedWorkspace(current: number): Workspace {
-  const state: Workspace = { version: 6, currentLevel: current, library: architectureLibrary(), proofs: {},
+  const state: Workspace = { version: 7, currentLevel: current, library: architectureLibrary(), proofs: {},
     circuits: Object.fromEntries(levels.map(level => [level.id, createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, 0]))])) };
   for (const level of levels) {
@@ -105,7 +105,8 @@ test('nested component dependencies survive public export and import with equiva
   await expect(page.getByRole('dialog', { name: '组件内部电路' }).locator('.react-flow__node')).toHaveCount(5);
   await page.screenshot({ path: 'work/nested-component.png' });
   await page.getByRole('button', { name: '关闭组件详情', exact: true }).click();
-  expect(exported.library).toEqual(state.library);
+  // v7 起规范组件不落档：导出库只含玩家封装的组件，规范依赖由载入方代码重建。
+  expect(exported.library).toEqual(Object.fromEntries(Object.entries(state.library).filter(([key]) => key.startsWith('component-'))));
   expect(graph(exported, 15)).toEqual(graph(state, 15));
   await page.getByRole('button', { name: '重置当前电路', exact: true }).click();
   await page.getByRole('button', { name: '确认重置', exact: true }).click();

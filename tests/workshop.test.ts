@@ -53,7 +53,7 @@ describe('workshop storage (v6)', () => {
     draft = connect(connect(draft, 'in-a', 'out', 'g-not', 'a', {}, true), 'g-not', 'out', 'out-y', 'in', {}, true);
     workspace.workshop = draft;
     const restored = parseWorkspace(serializeWorkspace(workspace), { verifyProofs: false });
-    expect(restored.version).toBe(6);
+    expect(restored.version).toBe(7);
     expect(restored.workshop?.levelId).toBe(0);
     expect(restored.workshop?.nodes.map(node => node.id)).toEqual(['in-a', 'g-not', 'out-y']);
     expect(validateWorkshopCircuit(restored.workshop!)).toEqual([]);
@@ -61,7 +61,7 @@ describe('workshop storage (v6)', () => {
 
   it('migrates v5 saves without a workshop field and rejects bogus workshop payloads', () => {
     const v5 = JSON.parse(serializeWorkspace(createWorkspace()));
-    expect(v5.version).toBe(6);
+    expect(v5.version).toBe(7);
     const legacy = JSON.stringify({ ...v5, version: 5 });
     const restored = parseWorkspace(legacy, { verifyProofs: false });
     expect(restored.workshop).toBeUndefined();

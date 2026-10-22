@@ -46,7 +46,7 @@ src/
 │
 ├─ simulation.worker.ts      # Web Worker：交互仿真会话、判题、存档解析、证明重验
 ├─ workerClient.ts           # 主线程侧：一次性后台任务 + useSimulation Hook
-├─ storage.ts                # 版本化存档（v1–v5 迁移、导入重验、序列化）
+├─ storage.ts                # 版本化存档（读 v1–v7 写 v7：稀疏草稿、规范库代码重建、导入重验）
 │
 ├─ components.ts             # 玩家组件：整图保存 / 框选封装 / 实例展开
 ├─ componentManagement.ts    # 组件库管理：重命名、软删除、依赖闭包、替换实例
@@ -190,7 +190,7 @@ Worker 承担全部重活，主线程只做 UI：
 - 第 21–44 关的时序场景帧（`TestSequence`：逐步 `{inputs, tick, expectedOutputs}`，覆盖保持、复位优先级、同沿读写旧值、回绕等细节）与第 33/34/40 关的公开用例集都以 `"generator": "名字"` 引用 `levelGenerators.ts`，编译期展开并复用手写数据的同一校验——JSON 保持人可编写的小体积，穷举数据由独立参考状态机（`temporalOracle` / `architectureOracle`）产生；第 45–56 关的编程用例与参考源是 JSON 里的紧凑数据。`defineLevel()`（同一编译器的 TS 包装）供程序化组装 spec 使用，不进入目录聚合。
 - `architectureSpec.ts` 是 ISA 唯一权威：16 位指令 = Opcode[15:12] · Param[11:8] · Imm[7:0]，10 条指令；`architectureOracle` 是完整参考 CPU（三阶段状态机）；`architecturePrograms` 是第 44 关判题用的 10 个测试程序。
 - `architectureCircuits.ts` 用 `Builder` DSL（`gate/and/or/split/join/mux/reg/dff/component...`）生成 23 个可查看的教学组件（mux1–16、register1–16、adder8、alu、registers、pc、decode、phase、controller、datapath、fetch、memory、computer）与第 33–44 关参考电路。注意 `architectureLibrary()` 每次返回全新深拷贝，调用方可安全保存/修改自己的副本。
-- 编程关卡（45–56）复用第 44 关整机：`programmingMachine()` 生成清空 ROM 的固定电路，`programmingMachineLibrary()` 计算其依赖闭包；`validateProgrammingMachine()` 通过规范化 JSON 比对（`stable()` 排序键、忽略位置与 ROM 字）确保玩家不能篡改硬件绕过任务。旧存档导入时以固定库兜底合并（`storage.ts`），被篡改的同名固定组件会拒绝导入。
+- **机器注册表（machines.ts）**：`MachineDescriptor { key, name, sourceLevel, instructions, circuit(levelId), library() }` 描述「之前关卡中构建的计算机」，`machines` 数组即扩展点（当前仅 `computer-44`，10 条指令）。编程关草稿由 `machineForLevel(id).circuit(id)` 生成（清空 ROM 的整机）；`machineKeyOf(circuit)` 按规范化图（`stable()` 排序键、忽略位置与 ROM 字）识别草稿当前持有哪台机器，`validateProgrammingMachine` 与注册表中任一机器逐字节等价即合法——判题本就对草稿电路跑门级仿真，天然按所选机器判定。汇编器 `assemble`/`disassemble` 接受可选机器参数，源码只能使用该机 `instructions` 子集（报「{机名}不支持指令 X」）；编程面板顶部的机器选择器（选项按通关 `sourceLevel` 解锁，单台时禁用）切换时保留能重新汇编的 `programSource`，汇编不过则清空 ROM 待重新应用。`programmingMachine.ts` 保留为纯转发垫片；关卡 JSON 的 `program.machine`（可选，默认注册表第一台）为未来关卡绑定新机预留。
 
 ## 9. 组件系统（components.ts / componentManagement.ts）
 
@@ -202,11 +202,13 @@ Worker 承担全部重活，主线程只做 UI：
 - **元件工坊（WorkshopView.tsx）**：独立于关卡的全屏搭建台。电路是 `levelId=0` 的工坊草稿（`createWorkshopCircuit`/`validateWorkshopCircuit` 不绑定关卡端口），INPUT/OUTPUT 自由添加且即未来组件接口；`model/components` 的增删连线封装操作都带 `workshop` 尾参切换到该校验。交互仿真复用 `useSimulation`（`simulator.checkedSession` 同样按 levelId 分派校验器），草稿持久化在 `Workspace.workshop`（开关值不持久化）；侧栏组件库可"新建元件"或对玩家组件"在工坊中编辑"（载入 `def.graph`，同名保存经 `define` 自动 vN+1）。
 - **组件库家族分组（libraryGrouping.ts）**：`groupComponentFamilies` 按「去掉位宽前缀的基础名（`stripWidthMarker`，识别 八位/4位/8-bit 等写法）+ 输入/输出端口数」把相似元件合为一家（端口数而非端口 id 作签名——工坊封装的组件端口 id 是随机节点 id）；家族内按端口推导位宽（`componentWidth`，全部端口位宽最大值）分桶，多个位宽变体时 UI 用小选择框切换（`activeVariant` 未选时默认最宽），桶内版本号降序、最新置顶。组件库标签页、教学组件面板与工坊调色板三处共用。
 
-## 10. 存档（storage.ts）
+## 10. 存档（storage.ts，v7）
 
-- `Workspace`（version 6）：`{ currentLevel, circuits, proofs, inputs, library, workshop? }`，localStorage 键 `logic-workshop.v1`。证明（proofs）独立于草稿——修改草稿不影响通关进度，但旧证明只对当初的电路负责；`workshop` 是元件工坊草稿（levelId=0 哨兵，`parseWorkshopCircuit` 走自由接口校验）。
-- `parseWorkspace` 兼容 v1（4 关）→ v6：v1–v4 按历史关卡上限严格校验、v5 以下合并固定机器库补齐第 45–56 关依赖；v5 起关卡目录随 JSON 增删变化，目录外的关卡键只丢弃对应数据而不让整个存档失效。`parseGraph`/`parseCircuit`/`parseLibrary` 逐字段严格校验（含 `programSource` 必须与 `words` 汇编一致、原型链键名防护）；最后（默认）在 Worker 里逐关重跑 `judge` 重验证明，全部通过才一次性替换工作区。
-- `serializeWorkspace` 输出确定性 JSON（先 `pruneDeletedComponents`），支持缩进参数供导出可读文件。
+- `Workspace`（version 7）：`{ currentLevel, circuits, proofs, inputs, library, workshop? }`，localStorage 键 `logic-workshop.v1`（不变，浏览器里的旧档下次启动自动升级）。证明（proofs）独立于草稿——修改草稿不影响通关进度，但旧证明只对当初的电路负责；`workshop` 是元件工坊草稿（levelId=0 哨兵，`parseWorkshopCircuit` 走自由接口校验）。
+- **稀疏存储**：文件只落玩家动过的关卡草稿/证明；缺失草稿载入时按目录合成（普通关 `createCircuit`、编程关按绑定机器），与种子完全一致的草稿（revision 与规范化图都相等）序列化时剪枝，round-trip 保持深度相等。目录外、非数字、或超该版本历史关卡上限（v1–v4 分别只到 4/20/32/44 关）的键一概忽略，不再让整档失效。
+- **规范组件不落档**：`library` 只存玩家组件（`component-*`）；规范机库 `canonicalMachineLibrary()`（全部教学组件 ∪ 每台注册机器的依赖闭包）由代码在解析时现建并以 `{...canonical, ...playerOnly}` 覆盖合并——代码版永远赢，篡改面归零，ISA/架构演进不再破坏旧档。代码已不认识的旧规范键（如更名前的 `architecture-mux1@2`）按玩家组件同等保留，否则引用它的历史草稿会失效；序列化与解析对称（规范键不写、未知键照写）。
+- `parseWorkspace` 接受 v1–v7（`>7` 专属报错「来自更新版本」）：`parseGraph`/`parseCircuit`/`parseLibrary` 逐字段严格校验（含 `programSource` 必须能在草稿当前识别的机器下汇编、原型链键名防护）；最后（默认）在 Worker 里逐关重跑 `judge` 重验证明，断链即截断、只降级进度不拒档，全部通过才一次性替换工作区。
+- `serializeWorkspace` 输出确定性 JSON（先 `pruneDeletedComponents`），支持缩进参数供导出可读文件；4 MB 上限为护栏（超限拒绝导入）。
 - 主线程写入策略（App.tsx）：状态变化后 400ms 防抖保存；`pagehide` 时强制落盘；失败时状态条持续提示并建议导出备份。
 
 ## 11. UI 层要点（App.tsx 及组件）
