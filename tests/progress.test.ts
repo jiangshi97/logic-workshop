@@ -1,24 +1,39 @@
-// 进度助手测试：真实目录（1..57 连续）上与旧的"id 当序号"语义完全等价；
-// 稀疏目录（关卡包引入的跳号 id）上按位置编号/解锁/前进。
+// 进度助手测试：连续的基础目录（1..56）上与旧的"id 当序号"语义完全等价；
+// 关卡包引入的跳号 id（随包示例关 901）按目录位置编号/解锁/前进。
 import { describe, expect, it } from 'vitest';
 import { levels } from '../src/levels';
 import { displayNumber, frontierLevelId, isCleared, isUnlocked, levelPosition, makeProgress, nextLevelId, unlockedCount } from '../src/progress';
 
 describe('progress helpers on the real catalogue', () => {
-  it('is equivalent to id-based semantics while ids stay contiguous 1..57', () => {
-    expect(levels.map(level => displayNumber(level.id))).toEqual(levels.map(level => level.id));
-    for (let done = 0; done <= levels.length; done += 7) {
-      for (const level of levels) {
+  const base = levels.filter(level => level.pack === undefined);
+
+  it('is equivalent to id-based semantics across the contiguous base catalogue', () => {
+    expect(base).toHaveLength(56);
+    expect(base.map(level => displayNumber(level.id))).toEqual(base.map(level => level.id));
+    for (let done = 0; done <= base.length; done += 7) {
+      for (const level of base) {
         expect(isUnlocked(level.id, done)).toBe(level.id <= done + 1);
         expect(isCleared(level.id, done)).toBe(level.id <= done);
       }
-      expect(frontierLevelId(done)).toBe(Math.min(done + 1, levels.length));
+      // 前沿仍在基础目录内时（done < 56），与旧的 min(done+1, 关数) 语义一致。
+      if (done < base.length) expect(frontierLevelId(done)).toBe(Math.min(done + 1, base.length));
     }
     expect(levelPosition(0)).toBe(-1);
     expect(levelPosition(999)).toBe(-1);
-    expect(nextLevelId(56)).toBe(57);
-    expect(nextLevelId(57)).toBeUndefined();
+    expect(nextLevelId(55)).toBe(56);
     expect(unlockedCount(0)).toBe(1);
+  });
+
+  it('numbers the shipped pack level by position, gated behind the whole base catalogue', () => {
+    expect(displayNumber(901)).toBe(57);
+    expect(levelPosition(901)).toBe(56);
+    expect(isUnlocked(901, 55)).toBe(false); // 第 56 关尚未通过
+    expect(isUnlocked(901, 56)).toBe(true);
+    expect(frontierLevelId(55)).toBe(56);
+    expect(frontierLevelId(56)).toBe(901); // 全通关后前沿落到包关卡
+    expect(nextLevelId(56)).toBe(901);
+    expect(nextLevelId(901)).toBeUndefined();
+    expect(unlockedCount(56)).toBe(57);
   });
 });
 

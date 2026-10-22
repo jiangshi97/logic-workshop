@@ -29,7 +29,7 @@ import { machineByKey, machineKeyOf, machines } from './machines';
 import { assemble } from './assembler';
 import { WorkshopView } from './WorkshopView';
 import { displayNumber, isUnlocked, nextLevelId } from './progress';
-import { resolveHook, type LevelEvent } from './levelPack';
+import { resolveHook, isOnceLevelEvent, type HookContext, type LevelHookKey, type TestReport } from './levelPack';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
 
@@ -162,20 +162,62 @@ function Workshop() {
   useEffect(() => { setObservedStep(null); }, [circuit.revision, fitEpoch]);
 
   const notify = useCallback((message: string) => setToast(message), []);
-  // ---- 关卡钩子（关卡包扩展点）：onEnter 首次进入 / onFirstClear 首次通关 / onFirstFail 首次判题失败。
-  // 触发记录写入存档（firedHooks）保证一次性；钩子只能经 notify/showMessage 产生可见效果。
+  // ---- 关卡钩子（关卡包扩展点）：事件目录与运行上下文的完整定义见 packages/level-api。
+  // 一次性事件的触发记录写入存档（firedHooks）保证只触发一次；周期性事件每次都触发。
+  // 钩子只能经 notify/showMessage/本关私有 store 产生可见效果，执行出错以 toast 报告、不中断游戏。
   const [hookDialog, setHookDialog] = useState<{ title: string; body: string } | null>(null);
-  const fireHook = useCallback((event: LevelEvent, target: Level) => {
+  const buildHookContext = useCallback((event: LevelHookKey, target: Level, test?: TestReport): HookContext => {
+    const snapshot = workspaceRef.current;
+    const done = Object.keys(snapshot.proofs).length;
+    const mine = (levelId?: number): number => levelId ?? target.id;
+    return {
+      level: target, event,
+      notify, showMessage: (title, body) => setHookDialog({ title, body }),
+      progress: {
+        done: () => done,
+        total: () => levels.length,
+        isCleared: levelId => snapshot.proofs[mine(levelId)] !== undefined,
+        isUnlocked: levelId => isUnlocked(mine(levelId), done),
+        displayNumber: levelId => displayNumber(mine(levelId)),
+        nextLevelId: levelId => nextLevelId(mine(levelId)),
+      },
+      catalog: { get: levelId => levels.find(item => item.id === levelId), all: () => levels, chapters: () => chapters },
+      store: {
+        get: <T,>(key: string): T | undefined => workspaceRef.current.packState?.[target.id]?.[key] as T | undefined,
+        set: (key, value) => {
+          if (!/^[A-Za-z0-9_-]{1,64}$/.test(key)) throw new Error('store 键只允许 1–64 位字母/数字/下划线/连字符。');
+          if (value === undefined) throw new Error('store 值不能是 undefined。');
+          const encoded = JSON.stringify(value);
+          if (encoded === undefined || encoded.length > 65536) throw new Error('单个 store 值必须可 JSON 序列化且不超过 64 KiB。');
+          const merged = { ...(workspaceRef.current.packState?.[target.id] ?? {}), [key]: value };
+          if (JSON.stringify(merged).length > 262144) throw new Error('本关 packState 总量超过 256 KiB 上限。');
+          setWorkspace(w => ({ ...w, packState: { ...w.packState, [target.id]: merged } }));
+        },
+        delete: key => setWorkspace(w => {
+          const levelState = w.packState?.[target.id];
+          if (!levelState || !(key in levelState)) return w;
+          const { [key]: _removed, ...rest } = levelState;
+          return { ...w, packState: { ...w.packState, [target.id]: rest } };
+        }),
+        keys: () => Object.keys(workspaceRef.current.packState?.[target.id] ?? {}),
+      },
+      draft: { nodes: snapshot.circuits[target.id]?.nodes.length ?? 0, wires: snapshot.circuits[target.id]?.wires.length ?? 0 },
+      ...(test !== undefined ? { test } : {}),
+    };
+  }, [notify]);
+  const fireHook = useCallback((event: LevelHookKey, target: Level, test?: TestReport) => {
     const ref = target.hooks?.[event];
-    if (!ref || workspaceRef.current.firedHooks?.[target.id]?.includes(event)) return;
-    setWorkspace(w => ({ ...w, firedHooks: { ...w.firedHooks, [target.id]: [...(w.firedHooks?.[target.id] ?? []), event] } }));
+    if (!ref) return;
+    if (isOnceLevelEvent(event)) {
+      if (workspaceRef.current.firedHooks?.[target.id]?.includes(event)) return;
+      setWorkspace(w => ({ ...w, firedHooks: { ...w.firedHooks, [target.id]: [...(w.firedHooks?.[target.id] ?? []), event] } }));
+    }
     const hook = resolveHook(ref);
     if (!hook) { notify(`关卡钩子 ${ref} 未注册。`); return; }
-    try {
-      hook({ level: target, notify, showMessage: (title, body) => setHookDialog({ title, body }) });
-    } catch (error) { notify(`关卡钩子 ${ref} 执行出错：${(error as Error).message}`); }
-  }, [notify]);
-  useEffect(() => { if (level.hooks?.onEnter) fireHook('onEnter', level); }, [current, fireHook, level]);
+    try { hook(buildHookContext(event, target, test)); }
+    catch (error) { notify(`关卡钩子 ${ref} 执行出错：${(error as Error).message}`); }
+  }, [notify, buildHookContext]);
+  useEffect(() => { fireHook('onEnter', level); fireHook('onEveryEnter', level); }, [current, fireHook, level]);
   const cancelTask = useCallback(() => { ++taskId.current; taskAbort.current?.abort(); taskAbort.current = null; setBusy(''); setVerifyingInitial(false); }, []);
   // 首次载入：localStorage 里的旧存档需要在 Worker 中重验证明后才替换默认工作区。
   useEffect(() => {
@@ -391,6 +433,9 @@ function Workshop() {
       const judged = await backgroundTask<TestResult>('judge', { circuit: clone(circuit), library: workspace.library }, controller.signal);
       if (id !== taskId.current || workspaceRef.current.currentLevel !== current || workspaceRef.current.circuits[current].revision !== circuit.revision) return;
       setResult(judged); setBusy(''); setFailureOnly(false);
+      const report: TestReport = judged.passed ? { passed: true } : judged.failure
+        ? { passed: false, failure: { inputs: judged.failure.inputs, mismatches: judged.failure.mismatches } }
+        : { passed: false };
       if (judged.failure) {
         if (programming) replayProgram(judged.failure);
         else {
@@ -398,26 +443,34 @@ function Workshop() {
           : samples.findIndex(i => level.inputs.every(name => i[name] === judged.failure!.inputs[name]));
         if (index >= 0) { observeSample(index); setPage(Math.floor(index / 8)); }
         }
-        fireHook('onFirstFail', level);
+        fireHook('onFirstFail', level, report);
       }
       if (judged.passed) {
         const firstClear = workspace.proofs[current] === undefined;
         setWorkspace(w => ({ ...w, proofs: { ...w.proofs, [current]: clone(circuit) } }));
-        if (firstClear) fireHook('onFirstClear', level);
+        if (firstClear) fireHook('onFirstClear', level, report);
       }
+      fireHook('onEveryTest', level, report);
       if (window.innerWidth < 1100) setTaskOpen(true);
     } catch (error) { if ((error as Error).name !== 'AbortError') { setBusy(''); notify((error as Error).message); } }
   };
 
   // ---- 组件库操作：保存/封装、放置（自动携带教学组件依赖）、重命名/删除/替换 ----
   const openPackage = (mode: 'selection' | 'whole') => { setPackageMode(mode); setComponentName(mode === 'whole' ? level.rewardName ?? level.title : '自定义组件'); };
+  const revealHint = () => {
+    const next = Math.min(level.hints.length, hintCount + 1);
+    setHints(h => ({ ...h, [current]: next }));
+    if (next === 1) fireHook('onFirstHint', level);
+    if (next === level.hints.length) fireHook('onAllHints', level);
+  };
   const saveComponent = () => {
+    const mode = packageMode;
     try {
       cancelTask();
       if (!componentName.trim()) throw new Error('请输入组件名称。');
-      const selectedGraph = packageMode === 'whole' ? circuit : { nodes: circuit.nodes.filter(node => selection.nodes.includes(node.id)), wires: [] };
+      const selectedGraph = mode === 'whole' ? circuit : { nodes: circuit.nodes.filter(node => selection.nodes.includes(node.id)), wires: [] };
       if (graphUsesDeletedComponent(selectedGraph, workspace.library)) throw new Error('已删除组件不能保存到新组件中。');
-      if (packageMode === 'whole') {
+      if (mode === 'whole') {
         const packaged = packageCircuit(circuit, componentName.trim(), workspace.library);
         setWorkspace(w => ({ ...w, library: packaged.library }));
       } else {
@@ -426,6 +479,7 @@ function Workshop() {
         setSelection({ nodes: [], wires: [] });
       }
       setPackageMode(null); setLibraryTab(true); notify('组件已保存。');
+      if (mode === 'whole') fireHook('onFirstPackage', level);
     } catch (error) { notify((error as Error).message); }
   };
   const placeComponent = (key: string, position?: { x: number; y: number }) => {
@@ -703,7 +757,7 @@ function Workshop() {
       <div className="editor-content">
         <section className={`board-area ${programming && machineVisible ? 'machine-first' : ''}`} aria-label="电路画布">
           {programming && <ProgrammingPanel key={`${current}:${fitEpoch}`} levelId={current} node={circuit.nodes.find(node => node.id === 'program')!} simulation={simulation} result={resultCurrent ? result : null} busy={!!busy} playing={playing} inputs={inputs} onInputs={next => { setPlaying(false); applyInputs(next); }} breakpoints={breakpoints} onBreakpoints={setBreakpoints} onDirty={setProgramDirty} onEditing={() => setPlaying(false)}
-            onApply={(words, programSource) => { commit({ ...circuit, revision: circuit.revision + 1, nodes: circuit.nodes.map(node => node.id === 'program' ? { ...node, words, programSource } : node) }); setFitEpoch(epoch => epoch + 1); notify('汇编已应用，当前用例已重新载入。'); }}
+            onApply={(words, programSource) => { commit({ ...circuit, revision: circuit.revision + 1, nodes: circuit.nodes.map(node => node.id === 'program' ? { ...node, words, programSource } : node) }); setFitEpoch(epoch => epoch + 1); notify('汇编已应用，当前用例已重新载入。'); fireHook('onFirstProgramApply', level); }}
             onStep={() => { setPlaying(false); setObservedStep(null); simulation.programStep(true); }} onCycle={() => { setPlaying(false); step(); }} onRun={toggleRun}
             onRestart={() => { setPlaying(false); setObservedStep(null); simulation.reset(); }} onCase={caseId => { setPlaying(false); setObservedStep(null); applyInputs({ E: 1, R: 0 }); simulation.programCase(caseId); }} onReplay={replayProgram}
             machineVisible={machineVisible} onMachineView={() => setMachineVisible(visible => !visible)}
@@ -779,7 +833,7 @@ function Workshop() {
               <div className="interface-section"><h3>接口</h3>{level.inputPorts.map(p => <div key={p.id}><span>输入</span><strong>{p.label}</strong><small>{p.bits} bit</small></div>)}{level.outputPorts.map(p => <div key={p.id}><span>输出</span><strong>{p.label}</strong><small>{p.bits} bit</small></div>)}</div>
               <div className="hint-section"><div><h3>思路提示</h3><span>{hintCount} / 3</span></div>
                 {level.hints.slice(0, hintCount).map((hint, index) => <p key={hint}><span>0{index + 1}</span>{hint}</p>)}
-                <button className="hint-button" disabled={hintCount === 3} onClick={() => setHints(h => ({ ...h, [current]: Math.min(3, (h[current] ?? 0) + 1) }))}><Lightbulb size={15} />{hintCount === 3 ? '提示已全部展开' : hintCount ? '下一条提示' : '展开提示'}<ChevronRight size={14} /></button>
+                <button className="hint-button" disabled={hintCount === 3} onClick={revealHint}><Lightbulb size={15} />{hintCount === 3 ? '提示已全部展开' : hintCount ? '下一条提示' : '展开提示'}<ChevronRight size={14} /></button>
               </div>
               <div className={`test-feedback ${resultCurrent && result?.passed ? 'passed' : resultCurrent && result ? 'not-passed' : ''}`} data-testid="test-feedback" aria-live="polite">
                 {resultCurrent && result ? result.passed ? <><CircleCheck size={23} /><strong>{testCount} / {testCount} {level.cases ? '测试集通过' : '全部通过'}</strong><p>{nextLevelId(current) === undefined ? `全部 ${levels.length} 关已完成，可以导出你的作品。` : programming ? '程序通过公开测试，下一关已解锁。' : '电路正确，下一关已解锁。'}</p>

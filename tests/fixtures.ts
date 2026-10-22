@@ -130,10 +130,10 @@ export function referenceCircuit(levelId: number): Circuit {
       b.output(adder.sum, 'Diff'); b.output(b.gate('NOT', adder.cout), 'Borrow');
       break;
     }
-    case 57: {
-      // JSON 追加关（测试关卡）：Diff 恒 0，Borrow = A + B（4 位截断）。
-      const adder = b.ripple(b.split(a, 4), b.split(second, 4), b.constant(0));
-      b.output(b.constant(0, 4), 'Diff'); b.output(adder.sum, 'Borrow');
+    case 901: {
+      // example 包示例关（四位减法）：A + ~B + 1 的低四位即 (A − B) mod 16。
+      const adder = b.ripple(b.split(a, 4), b.split(second, 4).map(value => b.gate('NOT', value)), b.constant(1));
+      b.output(adder.sum, 'Diff');
       break;
     }
     default: throw new Error(`No reference circuit for lesson ${levelId}`);

@@ -1,6 +1,7 @@
 // 关卡包机制测试：compileCatalogue 的 id 平移与守卫（内存假包）、生成器/钩子的命名空间解析
-// （含 example 空包的真实注册表）、包机器合并的 sourceLevel 翻译，以及"零包关卡 = 目录不变"。
+// （含 example 包的真实注册表与随包关卡）、包机器合并的 sourceLevel 翻译，以及基础目录冻结不变。
 import { describe, expect, it } from 'vitest';
+import { isOnceLevelEvent, LEVEL_EVENTS, LEVEL_HOOK_KEYS, RECURRING_LEVEL_EVENTS } from 'logic-level-api';
 import { compileCatalogue } from '../src/levelRegistry';
 import { levelPacks, resolveCaseGenerator, resolveHook, resolveScenarioGenerator, type LevelPack } from '../src/levelPack';
 import { chapters, levels } from '../src/levels';
@@ -64,13 +65,24 @@ describe('compileCatalogue', () => {
 });
 
 describe('the shipped example pack and extension resolvers', () => {
-  it('registers the example pack without adding levels, chapters or machines', () => {
+  it('ships the example pack with one sample level above the frozen base catalogue', () => {
     expect(generatedLevelPacks.map(entry => entry.folder)).toEqual(['example']);
     expect(levelPacks.map(pack => pack.key)).toEqual(['example']);
-    expect(levels).toHaveLength(57);
-    expect(levels.every(level => level.pack === undefined)).toBe(true);
-    expect(chapters).toHaveLength(7);
+    const base = levels.filter(level => level.pack === undefined);
+    expect(base.map(level => level.id)).toEqual(Array.from({ length: 56 }, (_, index) => index + 1));
+    const shipped = levels.filter(level => level.pack === 'example');
+    expect(shipped.map(level => level.id)).toEqual([901]); // idBase 900 + 包内 1 号
+    expect(shipped[0].hooks).toEqual({ onFirstClear: 'example/celebrate', onFirstHint: 'example/nudge', onEveryTest: 'example/coach' });
+    expect(chapters).toHaveLength(7); // 示例关卡复用第 7 章，包未追加章节
     expect(machines.map(machine => machine.key)).toEqual(['computer-44']);
+  });
+
+  it('splits hook events into persisted one-shot keys and recurring keys', () => {
+    expect(LEVEL_EVENTS).toEqual(['onEnter', 'onFirstHint', 'onAllHints', 'onFirstFail', 'onFirstClear', 'onFirstPackage', 'onFirstProgramApply']);
+    expect(RECURRING_LEVEL_EVENTS).toEqual(['onEveryEnter', 'onEveryTest']);
+    expect(LEVEL_HOOK_KEYS).toHaveLength(9);
+    expect(isOnceLevelEvent('onEveryTest')).toBe(false);
+    expect(isOnceLevelEvent('onFirstClear')).toBe(true);
   });
 
   it('resolves bare generator names from the base registry and namespaced ones from packs', () => {

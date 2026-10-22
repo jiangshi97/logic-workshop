@@ -25,6 +25,8 @@ export interface Workspace {
   library: ComponentLibrary;
   workshop?: Circuit;
   firedHooks?: Record<number, LevelEvent[]>;
+  /** 关卡包钩子的本关私有 store（v7 后期加法字段：老档缺省 = 空；值为任意 JSON 数据）。 */
+  packState?: Record<number, Record<string, unknown>>;
 }
 
 export function createWorkspace(): Workspace {
@@ -43,6 +45,9 @@ function record(value: unknown, error: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(error);
   return value as Record<string, unknown>;
 }
+// 普通对象（非数组/非 null）：packState 的关卡值必须是这种形状。
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** 解析并校验单张图；仅接受已知字段，非 ROM 节点携带 words/programSource 会被拒绝。 */
 function parseGraph(raw: unknown): CircuitGraph {
@@ -248,6 +253,18 @@ export function parseWorkspace(text: string, options: { verifyProofs?: boolean }
     }
     workspace.firedHooks = fired;
   }
+  // 关卡包私有 store：只认目录内关卡，值必须是普通对象；单关序列化超过 256 KiB 视为损坏，忽略该关。
+  if (raw.packState !== undefined) {
+    const state: Record<number, Record<string, unknown>> = {};
+    for (const [key, value] of Object.entries(record(raw.packState, 'packState 格式无效。'))) {
+      if (!/^[1-9][0-9]*$/.test(key)) continue;
+      const id = Number(key);
+      if (!catalogue.has(id) || !isRecord(value)) continue;
+      try { if (JSON.stringify(value).length > 262144) continue; } catch { continue; }
+      state[id] = { ...value };
+    }
+    if (Object.keys(state).length) workspace.packState = state;
+  }
   if (raw.workshop !== undefined) workspace.workshop = parseWorkshopCircuit(raw.workshop, workspace.library);
   return workspace;
 }
@@ -299,6 +316,7 @@ export function serializeWorkspace(workspace: Workspace, space?: number) {
     circuits: circuits(workspace.circuits), proofs: circuits(workspace.proofs), inputs: workspace.inputs, library,
     ...(workspace.workshop ? { workshop: { levelId: 0, revision: workspace.workshop.revision, ...graph(workspace.workshop) } } : {}),
     ...(workspace.firedHooks && Object.keys(workspace.firedHooks).length ? { firedHooks: workspace.firedHooks } : {}),
+    ...(workspace.packState && Object.keys(workspace.packState).length ? { packState: workspace.packState } : {}),
   }, null, space);
 }
 

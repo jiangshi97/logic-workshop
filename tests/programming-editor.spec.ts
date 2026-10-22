@@ -177,12 +177,12 @@ test('all twelve applications judge actual reference programs and unlock through
     if (id < 56) await page.getByRole('button', { name: '下一关', exact: true }).click();
   }
   await expect(page.getByTestId('test-feedback')).toContainText('下一关已解锁');
-  await expect(page.getByTestId('progress-count')).toHaveText('56 / 57');
+  await expect(page.getByTestId('progress-count')).toHaveText(`56 / ${levels.length}`);
   await page.screenshot({ path: 'work/programming-complete-desktop.png' });
-  // 第 57 关是 JSON 追加的组合关（Diff/Borrow 表达式）：完成 56 关即达成编程阶段，57 处于未通关状态。
+  // 基础目录止于第 56 关：下一关是 example 包的四位减法（全局 id 901，显示为第 57 关）。
   await page.getByRole('button', { name: '下一关', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '测试关卡', exact: true })).toBeVisible();
-  await page.screenshot({ path: 'work/level-57.png' });
+  await expect(page.getByRole('heading', { name: '四位减法', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'work/level-901.png' });
 });
 
 test('long programming tasks keep animation and pause responsive, including the mobile workbench', async ({ page }) => {
@@ -219,7 +219,7 @@ test('the migrated v5 save imports at full progress into the assembly workbench'
   await page.goto('/');
   await page.locator('input[type=file]').setInputFiles({ name: 'migrated-v5.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(state)) });
   await expect(page.locator('.toast')).toContainText('存档已导入', { timeout: 180_000 });
-  await expect(page.getByTestId('progress-count')).toHaveText('56 / 57');
+  await expect(page.getByTestId('progress-count')).toHaveText(`56 / ${levels.length}`);
   await expect(page.getByRole('textbox', { name: '汇编源代码' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: '选择计算机' })).toBeDisabled();
   await page.screenshot({ path: 'work/migrated-v5-workbench.png' });

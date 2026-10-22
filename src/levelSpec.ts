@@ -1,7 +1,8 @@
 // 关卡编写 API：声明式 LevelSpec（JSON 兼容）的运行时校验与编译。
 // 一份 spec 数据即可描述任意模式的关卡：文案、端口、可用门型、提示与期望值全部是数据；
 // compileLevelSpec 把它编译成内部 Level——组合关期望来自表达式/真值表，时序关期望预填在帧里，
-// 编程关用例进入注册表供 programmingSpec 查询。全部 57 关均由 content/levels/*.json 描述，
+// 编程关用例进入注册表供 programmingSpec 查询。基础 57 关由 content/levels/*.json 描述，
+// 新增关卡走 content/packs/ 关卡包（包内 JSON 同构，另可挂生成器/钩子等包内 TS 扩展点）；
 // 海量穷举数据（时序帧/公开用例）以命名生成器引用（levelGenerators.ts）在编译期展开，JSON 保持小体积；
 // defineLevel 是 TS 逃生门（同样走本编译器），供需要在代码里组装 spec 的场景。
 import type { GateType, Inputs, Outputs, Port, TestSequence } from './contracts';
@@ -9,7 +10,7 @@ import type { Level } from './levels';
 import type { ProgramCase } from './programmingSpec';
 import { compileExpression } from './levelExpr';
 import { gateTypes } from './gates';
-import { findCaseGenerator, findScenarioGenerator, LEVEL_EVENTS, resolveCaseGenerator, resolveScenarioGenerator, type LevelHooks, type LevelPack } from './levelPack';
+import { findCaseGenerator, findScenarioGenerator, LEVEL_HOOK_KEYS, resolveCaseGenerator, resolveScenarioGenerator, type LevelHooks, type LevelPack } from './levelPack';
 import type { GeneratorContext } from './levelGenerators';
 
 /** 编译上下文：关卡包目录装载时传入（包键/包内编号/包清单），测试也可用假包清单注入。 */
@@ -274,8 +275,8 @@ function validateLevelSpec(input: unknown): LevelSpec {
   if (input.hooks !== undefined) {
     if (!isRecord(input.hooks)) fail(id, 'hooks 必须是对象。');
     for (const [event, ref] of Object.entries(input.hooks)) {
-      if (!(LEVEL_EVENTS as readonly string[]).includes(event))
-        fail(id, `hooks 的键必须是 ${LEVEL_EVENTS.join(' / ')} 之一。`);
+      if (!(LEVEL_HOOK_KEYS as readonly string[]).includes(event))
+        fail(id, `hooks 的键必须是 ${LEVEL_HOOK_KEYS.join(' / ')} 之一。`);
       if (typeof ref !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}\/[a-z0-9][a-z0-9-]{0,63}$/.test(ref))
         fail(id, `hooks.${event} 必须是形如“包键/钩子名”的引用。`);
     }

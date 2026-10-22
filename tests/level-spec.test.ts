@@ -94,6 +94,14 @@ describe('level spec compilation', () => {
     expect(compileLevelSpec(spec101).hooks).toBeUndefined();
   });
 
+  it('accepts every documented hook event, one-shot and recurring alike', () => {
+    const hooks = {
+      onEnter: 'p/a', onFirstHint: 'p/b', onAllHints: 'p/c', onFirstFail: 'p/d', onFirstClear: 'p/e',
+      onFirstPackage: 'p/f', onFirstProgramApply: 'p/g', onEveryEnter: 'p/h', onEveryTest: 'p/i',
+    };
+    expect(compileLevelSpec({ ...spec101, hooks }).hooks).toEqual(hooks);
+  });
+
   it('accepts typed specs through defineLevel with the same validation', () => {
     const level = defineLevel({ ...spec101, combinational: { expect: { Y: 'A & B' } } } as never);
     expect(level.expectedOutputs({ A: 1, B: 1 })).toEqual({ Y: 1 });

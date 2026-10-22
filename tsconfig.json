@@ -9,7 +9,8 @@
     "noEmit": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "paths": { "logic-level-api": ["./packages/level-api/src/index.ts"] }
   },
-  "include": ["src", "tests", "content/packs", "vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "tests", "content/packs", "packages", "vite.config.ts", "playwright.config.ts"]
 }

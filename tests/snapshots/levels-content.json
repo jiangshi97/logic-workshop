@@ -17310,10 +17310,10 @@
    "digest": "0a86612b9daf7a42",
    "referenceSourceChars": 224
   },
-  "57": {
+  "901": {
    "kind": "combinational",
    "samples": 256,
-   "digest": "83d0a891a575c0b8"
+   "digest": "2c3ea6bff8d68e5d"
   }
  },
  "meta": [
@@ -17728,11 +17728,11 @@
    "allowedCount": 12
   },
   {
-   "id": 57,
-   "title": "测试关卡",
+   "id": 901,
+   "title": "四位减法",
    "chapter": 7,
    "allowedCount": 12,
-   "rewardName": "测试"
+   "rewardName": "Subtract4"
   }
  ]
 }

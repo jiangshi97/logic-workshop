@@ -95,11 +95,12 @@ it('drops level keys beyond the catalogue instead of invalidating a v6 save', ()
     circuits: { ...state.circuits, 100: state.circuits[1] },
     proofs: { 1: proof, 100: proof }, inputs: { 1: { A: 1 }, 100: { A: 1 } }, library: state.library };
   const restored = parseWorkspace(JSON.stringify(poisoned), { verifyProofs: false });
-  expect(restored.circuits[57]).toBeDefined();
+  expect(restored.circuits[56]).toBeDefined();
   expect(restored.proofs[1]).toBeDefined();
   expect(restored.proofs[100]).toBeUndefined();
   expect(restored.inputs[100]).toBeUndefined();
-  expect(restored.currentLevel).toBe(levels.length);
+  // verifyProofs: false 时全目录视为已解锁，回落到前沿关 = 最后一关（关卡包下末关 id 未必等于序号）。
+  expect(restored.currentLevel).toBe(levels[levels.length - 1].id);
 });
 
 it('ignores malformed level keys instead of invalidating a v7 save', () => {
@@ -152,6 +153,22 @@ it('round-trips one-shot hook trigger records and filters junk events', () => {
   expect(parseWorkspace(serializeWorkspace(state), { verifyProofs: false }).firedHooks).toEqual({ 45: ['onFirstClear', 'onEnter'] });
   const junk = JSON.stringify({ ...state, firedHooks: { 999: ['onEnter'], 45: ['nonsense', 'onFirstFail'], bad: ['onEnter'] } });
   expect(parseWorkspace(junk, { verifyProofs: false }).firedHooks).toEqual({ 45: ['onFirstFail'] });
+});
+
+it('round-trips per-level pack state and drops junk or oversized entries', () => {
+  const state = createWorkspace();
+  expect(JSON.parse(serializeWorkspace(createWorkspace())).packState).toBeUndefined();
+  state.packState = { 901: { clearCount: 1, note: '你好' }, 45: { tries: 3 } };
+  expect(parseWorkspace(serializeWorkspace(state), { verifyProofs: false }).packState).toEqual(state.packState);
+  const junk = JSON.stringify({ ...state, packState: {
+    999: { x: 1 },                       // 目录外关卡：丢弃
+    bad: { x: 1 },                       // 非数字键：丢弃
+    45: 'not-a-record',                  // 非对象值：丢弃
+    901: { clearCount: 2 },              // 保留
+  } });
+  expect(parseWorkspace(junk, { verifyProofs: false }).packState).toEqual({ 901: { clearCount: 2 } });
+  const huge = 'x'.repeat(262145);
+  expect(parseWorkspace(JSON.stringify({ ...state, packState: { 45: { blob: huge } } }), { verifyProofs: false }).packState).toBeUndefined();
 });
 
 it('refuses saves written by a newer application with a dedicated message', () => {

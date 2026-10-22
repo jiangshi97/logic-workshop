@@ -1,0 +1,9 @@
+{
+  "name": "logic-level-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "逻辑工坊关卡包 API：事件钩子、关卡 TS 运行上下文、生成器与包描述符类型",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts"
+}

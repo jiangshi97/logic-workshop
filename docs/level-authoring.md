@@ -1,6 +1,6 @@
 # 关卡编写指南（LevelSpec / JSON）
 
-本文面向要给「逻辑工坊」新增关卡的作者。**全部 57 个基础关卡都用这里的格式编写**（`content/levels/*.json`）：
+本文面向要给「逻辑工坊」新增关卡的作者。**全部 56 个基础关卡都用这里的格式编写**（`content/levels/*.json`）：
 文案、端口、提示、判题期望（表达式 / 帧时间线 / 数学用例）全部是数据，不需要触碰任何判题或仿真代码。
 固定机器与教学组件的**电路**（第 44 关整机、`architecture-*` 教学组件）仍以代码维护，
 那是元件库，不是关卡定义。
@@ -44,7 +44,7 @@
 | `hints` | string[3] | ✓ | 恰好三条递进提示 |
 | `rewardName` | string | — | 通关后可把整关电路打包成组件的默认命名 |
 | `defaultProgram` | number[] | — | ROM 初始指令字（最多 256 个 16 位字） |
-| `hooks` | 对象 | — | 关卡钩子声明（仅关卡包有意义）：`{ "onEnter" / "onFirstClear" / "onFirstFail": "包名/钩子名" }`，见关卡包一节 |
+| `hooks` | 对象 | — | 关卡钩子声明（仅关卡包有意义）：`{ 事件名: "包名/钩子名" }`，9 个事件见关卡包一节 |
 | `combinational` / `sequential` / `program` | 对象 | 三选一 | 判题模式段，必须恰好提供一个 |
 
 ## 表达式语言（组合关期望值）
@@ -172,7 +172,7 @@ JSON 只保留人写的内容与一个名字，编译期由 `src/levelGenerators
 
 ```json
 {
-  "id": 57,
+  "id": 56,
   "title": "…", "caption": "…", "goal": "…", "formula": "OUT = (3n) mod 256",
   "chapter": 7,
   "inputs": [["In", 8]], "outputs": [["Out", 8]],
@@ -206,14 +206,14 @@ content/packs/我的扩展/
   其余 TS 自由组织 # 生成器、钩子、机器电路、参考实现……index.ts 引它们
 ```
 
-`index.ts` 导出一个 `pack: LevelPack` 描述符（类型见 `src/levelPack.ts`）：
+`index.ts` 导出一个 `pack: LevelPack` 描述符（类型从公共 API 包导入）：
 
 ```ts
-import type { LevelPack } from '../../../src/levelPack';
+import type { LevelPack } from 'logic-level-api';
 
 export const pack: LevelPack = {
   key: '我的扩展',      // 必须与文件夹同名；JSON 里的引用都用它做命名空间（"我的扩展/xxx"）
-  idBase: 100,          // 包内关卡的全局 id = idBase + JSON id。选一个远离 57 的固定值，永不改动
+  idBase: 100,          // 包内关卡的全局 id = idBase + JSON id。选一个远离基础目录（当前止于 56）的固定值，永不改动
   chapters: ['指令集扩展'],  // 可选：追加章节（编号接在基础 7 章之后）
   // 以下全部可选，按需注册：
   // scenarioGenerators: new Map([['场景生成器名', fn]]),
@@ -226,7 +226,7 @@ export const pack: LevelPack = {
 ### 编号规则（不用关心全局计数）
 
 - 关卡 JSON 的 `id` **只需在本包内唯一**，从 1 编起、允许跳号；全局 id 由 `idBase + id` 推导。
-- `idBase` 是一次性决定：必须使包内全部关卡都大于基础目录最大关卡号（57），且与其他包的区间不相交
+- `idBase` 是一次性决定：必须使包内全部关卡都大于基础目录最大关卡号（当前 56），且与其他包的区间不相交
   ——编译期守卫（`src/levelRegistry.ts`）违反即报错并列出冲突双方。相邻包留出足够间隔（如 100 / 200）。
 - 存档、判题、解锁全部使用推导后的全局 id，**稳定不随版本变化**（所以 idBase 定了就不要改）。
 - 侧栏显示的"第 N 关"、解锁进度、"下一关"一律按**目录位置**计算（`src/progress.ts`），
@@ -250,21 +250,27 @@ export const pack: LevelPack = {
 
    ```json
    "hooks": {
-     "onEnter":      "我的扩展/开场白",
      "onFirstClear": "我的扩展/通关彩蛋",
-     "onFirstFail":  "我的扩展/鼓励"
+     "onFirstHint":  "我的扩展/提示引导",
+     "onEveryTest":  "我的扩展/教练"
    }
    ```
 
-   三个事件各自**至多触发一次**（触发记录随存档持久化，导入/刷新不重放）：
-   `onEnter` 首次进入该关；`onFirstClear` 该关第一次通过判题；`onFirstFail` 该关第一次判题失败。
-   钩子是普通函数，只能经上下文 API 产生可见效果：
+   可用事件共 9 个：**一次性**（每关至多触发一次，记录随存档持久化、导入/刷新不重放）
+   `onEnter` 首次进入 / `onFirstHint` 首次展开提示 / `onAllHints` 提示全部展开 / `onFirstFail` 首次判题失败 /
+   `onFirstClear` 首次通关 / `onFirstPackage` 首次把本关电路保存为组件 / `onFirstProgramApply` 编程关首次应用汇编；
+   **周期性**（每次都触发，不持久化）`onEveryEnter` 每次进入 / `onEveryTest` 每次判题结束（携带 `test` 报告）。
+   钩子是普通函数，经上下文 API 产生可见效果（toast / 弹窗 / 本关私有 store / 进度与目录查询）：
 
    ```ts
-   import type { HookContext } from '../../../src/levelPack';
-   const 通关彩蛋 = ({ level, showMessage }: HookContext) =>
+   import type { HookContext } from 'logic-level-api';
+   const 通关彩蛋 = ({ level, showMessage, store }: HookContext) => {
+     store.set('clearedAt', new Date().toISOString());   // 本关私有，随存档持久化
      showMessage('新指令解锁', `「${level.title}」通关！接下来可以试试 AND 指令。`);
+   };
    ```
+
+   完整 API（含进度查询、判题报告、种子随机工具）见 [logic-level-api](../packages/level-api/README.md)。
 
 3. **机器**：编程关的 `program.machine` 填包内注册的机器 key。包机器的 `sourceLevel` 写**包内编号**，
    装载时自动翻译成全局 id；玩家通关来源关后即在机器选择器中解锁。机器的整机电路与依赖闭包
@@ -278,7 +284,9 @@ export const pack: LevelPack = {
 - 对 `src/machines.ts` 只做 `import type`（防运行时循环依赖）；其余核心模块随意。
 - 包内自定义组件的键避开基础目录的 `architecture-*` 前缀，防止与规范教学组件同名覆盖。
 
-`content/packs/example/` 是一个始终在线的最小模板（0 关卡），生成器/钩子的完整写法直接抄它。
+`content/packs/example/` 是一个始终在线的最小模板（含一个示例关卡 `levels/001-my-pack-test.json`，
+演示包内编号、idBase 平移与三个钩子的完整接线——通关彩蛋 `onFirstClear`、提示引导 `onFirstHint`、
+失败计数教练 `onEveryTest`），生成器/钩子的写法直接抄它。
 
 ## 工作流与守卫
 

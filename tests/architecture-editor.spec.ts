@@ -52,7 +52,7 @@ test('a migrated stage-five save unlocks architecture and lets users place 16-bi
   await page.locator('input[type=file]').setInputFiles({ name: 'v3-save.json', mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ version: 3, currentLevel: 32, circuits, inputs, proofs: circuits, library: {} })) });
   await expect(page.getByRole('status')).toContainText('存档已导入', { timeout: 90_000 });
-  await expect(page.getByTestId('progress-count')).toHaveText('32 / 57');
+  await expect(page.getByTestId('progress-count')).toHaveText(`32 / ${levels.length}`);
   await page.getByRole('button', { name: /第 33 关/ }).click();
   await expect(page.getByRole('heading', { name: '八位加减器', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: '基础组件', exact: true }).click();

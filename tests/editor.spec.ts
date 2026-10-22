@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { levels } from '../src/levels';
 const browserErrors = new WeakMap<Page, string[]>();
 
 async function wire(page: Page, source: string, target: string, port = 'in') {
@@ -56,7 +57,7 @@ test('builds every gate lesson through actual editor connections', async ({ page
     if (level === 4) await page.screenshot({ path: 'work/first-four-preview.png', fullPage: true });
     if (level !== 4) await page.getByRole('button', { name: '下一关', exact: true }).click();
   }
-  await expect(page.getByTestId('progress-count')).toContainText('4 / 57');
+  await expect(page.getByTestId('progress-count')).toContainText(`4 / ${levels.length}`);
 });
 
 test('undoes and restores connections, resets only current draft', async ({ page }) => {
