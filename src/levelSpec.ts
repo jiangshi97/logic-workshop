@@ -9,7 +9,15 @@ import type { Level } from './levels';
 import type { ProgramCase } from './programmingSpec';
 import { compileExpression } from './levelExpr';
 import { gateTypes } from './gates';
-import { caseGenerators, scenarioGenerators, type GeneratorContext } from './levelGenerators';
+import { findCaseGenerator, findScenarioGenerator, LEVEL_EVENTS, resolveCaseGenerator, resolveScenarioGenerator, type LevelHooks, type LevelPack } from './levelPack';
+import type { GeneratorContext } from './levelGenerators';
+
+/** 编译上下文：关卡包目录装载时传入（包键/包内编号/包清单），测试也可用假包清单注入。 */
+export interface CompileContext {
+  pack?: string;
+  localId?: number;
+  packs?: readonly LevelPack[];
+}
 
 /** 门类型解锁表：[门型, 首次可用关卡]，仅对第 1–20 关的组合关卡有推导意义。 */
 export const gateUnlocks: [GateType, number][] = [
@@ -70,6 +78,8 @@ export interface LevelSpec {
   hints: string[];
   rewardName?: string;
   defaultProgram?: number[];
+  /** 关卡钩子声明：值是 "包键/钩子名" 引用，在事件期由 levelPack 注册表解析（编译期只校验形状）。 */
+  hooks?: LevelHooks;
   combinational?: CombinationalSpec;
   sequential?: SequentialSpec;
   program?: ProgramSpec;
@@ -261,6 +271,15 @@ function validateLevelSpec(input: unknown): LevelSpec {
       || input.defaultProgram.some(w => whole(w) === undefined || w < 0 || w > 65535))
       fail(id, 'defaultProgram 必须是最多 256 个 16 位指令字。');
   }
+  if (input.hooks !== undefined) {
+    if (!isRecord(input.hooks)) fail(id, 'hooks 必须是对象。');
+    for (const [event, ref] of Object.entries(input.hooks)) {
+      if (!(LEVEL_EVENTS as readonly string[]).includes(event))
+        fail(id, `hooks 的键必须是 ${LEVEL_EVENTS.join(' / ')} 之一。`);
+      if (typeof ref !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}\/[a-z0-9][a-z0-9-]{0,63}$/.test(ref))
+        fail(id, `hooks.${event} 必须是形如“包键/钩子名”的引用。`);
+    }
+  }
   const sections = (['combinational', 'sequential', 'program'] as const).filter(key => input[key] !== undefined);
   if (sections.length !== 1) fail(id, `必须且只能提供 combinational / sequential / program 之一，当前有 ${sections.length} 个。`);
   if (input.combinational !== undefined) validateCombinational(id, input.combinational, inputPorts, outputPorts);
@@ -271,8 +290,9 @@ function validateLevelSpec(input: unknown): LevelSpec {
 
 const normalize = (value: number, bits: number): number => ((value % 2 ** bits) + 2 ** bits) % 2 ** bits;
 
-/** 把声明式关卡编译为内部 Level：表达式闭包 / 真值表查找 / 帧时间线 / 编程用例注册。 */
-export function compileLevelSpec(input: unknown): Level {
+/** 把声明式关卡编译为内部 Level：表达式闭包 / 真值表查找 / 帧时间线 / 编程用例注册。
+ *  context 供关卡包目录装载时传入包键、包内编号与包清单（生成器解析与上下文）；直接调用可省略。 */
+export function compileLevelSpec(input: unknown, context?: CompileContext): Level {
   const spec = validateLevelSpec(input);
   const inputPorts = spec.inputs.map(([id, bits]) => ({ id, label: id, bits }));
   const outputPorts = spec.outputs.map(([id, bits]) => ({ id, label: id, bits }));
@@ -288,20 +308,25 @@ export function compileLevelSpec(input: unknown): Level {
     : undefined;
 
   // 生成器引用在此展开为具体帧/用例数据，并复用手写数据的同一套校验，两条路径编译结果完全一致。
-  const expandWith = <T>(registry: Map<string, (context: GeneratorContext) => T[]>, name: string, validate: (data: T[]) => void): T[] => {
-    const generator = registry.get(name);
+  // 解析走 levelPack：裸名查基础 levelGenerators，"包键/名字" 查对应关卡包（老关卡引用零迁移）；
+  // 目录装载传入包清单时按清单解析（compileCatalogue 的守卫与解析使用同一份包数据）。
+  const lookupScenario = context?.packs ? (name: string) => findScenarioGenerator(name, context.packs!) : resolveScenarioGenerator;
+  const lookupCase = context?.packs ? (name: string) => findCaseGenerator(name, context.packs!) : resolveCaseGenerator;
+  const expandWith = <T>(lookup: (name: string) => ((context: GeneratorContext) => T[]) | undefined, name: string, validate: (data: T[]) => void): T[] => {
+    const generator = lookup(name);
     if (!generator) fail(spec.id, `未知的生成器“${name}”。`);
-    const data = generator({ id: spec.id, inputPorts, outputPorts });
+    const data = generator({ id: spec.id, inputPorts, outputPorts,
+      ...(context?.pack ? { pack: context.pack, localId: context.localId } : {}) });
     validate(data);
     return data;
   };
   const scenarios = spec.sequential === undefined ? undefined
     : spec.sequential.scenarios !== undefined ? spec.sequential.scenarios
-    : expandWith(scenarioGenerators, spec.sequential.generator!,
+    : expandWith(lookupScenario, spec.sequential.generator!,
       data => validateScenarioList(spec.id, data, inputPorts, outputPorts));
   const publicCases = spec.combinational?.cases === undefined ? undefined
     : Array.isArray(spec.combinational.cases) ? spec.combinational.cases
-    : expandWith(caseGenerators, spec.combinational.cases.generator, data => validateCaseList(spec.id, data, inputPorts));
+    : expandWith(lookupCase, spec.combinational.cases.generator, data => validateCaseList(spec.id, data, inputPorts));
 
   const expectedOutputs = (inputs: Inputs): Outputs => {
     if (spec.combinational?.truthTable) {
@@ -357,6 +382,7 @@ export function compileLevelSpec(input: unknown): Level {
     hints: [...spec.hints], rewardName: spec.rewardName,
     ...(spec.defaultProgram ? { defaultProgram: [...spec.defaultProgram] } : {}),
     ...(spec.program?.machine ? { machine: spec.program.machine } : {}),
+    ...(spec.hooks && Object.keys(spec.hooks).length ? { hooks: { ...spec.hooks } } : {}),
     expectedOutputs,
     ...(mode ? { mode } : {}),
     ...(scenarios ? { sequences } : {}),

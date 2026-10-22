@@ -7,7 +7,7 @@ import { CircuitBoard, Check, ChevronRight, ArrowRight, Undo2, Redo2, Trash2, Ro
   ZoomIn, ZoomOut, Maximize, Download, Upload, LockKeyhole, Lightbulb, X, CircleCheck, CircleAlert,
   Menu, SlidersHorizontal, Cable, Plus, BookOpen, MousePointer2, Copy, Package, UnfoldHorizontal, ChevronLeft, Clock3, Pencil, Eye, Replace, Wrench } from 'lucide-react';
 import { addGate, addComponent, getPorts, validateCircuit, connect, canConnect, createCircuit, createWorkshopCircuit, removeSelection, type Circuit } from './model';
-import { chapters, levels, getLevel, testInputs, testSequences, type GateType, type Inputs } from './levels';
+import { chapters, levels, getLevel, testInputs, testSequences, type GateType, type Inputs, type Level } from './levels';
 import type { TestResult, ComponentDefinition, ComponentLibrary } from './contracts';
 import { encapsulateSelection, expandComponent, packageCircuit } from './components';
 import { backgroundTask, useSimulation } from './workerClient';
@@ -28,6 +28,8 @@ import { programmingCases } from './programmingSpec';
 import { machineByKey, machineKeyOf, machines } from './machines';
 import { assemble } from './assembler';
 import { WorkshopView } from './WorkshopView';
+import { displayNumber, isUnlocked, nextLevelId } from './progress';
+import { resolveHook, type LevelEvent } from './levelPack';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
 
@@ -55,7 +57,7 @@ function Workshop() {
   const teachingLibrary = useMemo(architectureLibrary, []);
   const chapterGroups = useMemo(() => chapters.map((title, index) => ({
     number: index + 1, title, lessons: levels.filter(item => item.chapter === index + 1),
-  })), []);
+  })).filter(group => group.lessons.length > 0), []);
   const inspectionLibrary = useMemo(() => ({ ...teachingLibrary, ...workspace.library }), [teachingLibrary, workspace.library]);
   const inputs = workspace.inputs[current];
   // ---- 机器选择：编程关可在已通关关卡构建出的计算机之间切换；判定按当前草稿持有的机器执行 ----
@@ -131,7 +133,6 @@ function Workshop() {
     return () => cancelAnimationFrame(frame);
   }, [fitEpoch, current, circuit.nodes.length, flow, programming, machineVisible]);
   const done = Object.keys(workspace.proofs).length;
-  const unlocked = Math.min(levels.length, done + 1);
   const currentHistory = history[current] ?? { past: [], future: [] };
   const resultCurrent = result?.revision === circuit.revision;
   const hintCount = hints[current] ?? 0;
@@ -161,6 +162,20 @@ function Workshop() {
   useEffect(() => { setObservedStep(null); }, [circuit.revision, fitEpoch]);
 
   const notify = useCallback((message: string) => setToast(message), []);
+  // ---- 关卡钩子（关卡包扩展点）：onEnter 首次进入 / onFirstClear 首次通关 / onFirstFail 首次判题失败。
+  // 触发记录写入存档（firedHooks）保证一次性；钩子只能经 notify/showMessage 产生可见效果。
+  const [hookDialog, setHookDialog] = useState<{ title: string; body: string } | null>(null);
+  const fireHook = useCallback((event: LevelEvent, target: Level) => {
+    const ref = target.hooks?.[event];
+    if (!ref || workspaceRef.current.firedHooks?.[target.id]?.includes(event)) return;
+    setWorkspace(w => ({ ...w, firedHooks: { ...w.firedHooks, [target.id]: [...(w.firedHooks?.[target.id] ?? []), event] } }));
+    const hook = resolveHook(ref);
+    if (!hook) { notify(`关卡钩子 ${ref} 未注册。`); return; }
+    try {
+      hook({ level: target, notify, showMessage: (title, body) => setHookDialog({ title, body }) });
+    } catch (error) { notify(`关卡钩子 ${ref} 执行出错：${(error as Error).message}`); }
+  }, [notify]);
+  useEffect(() => { if (level.hooks?.onEnter) fireHook('onEnter', level); }, [current, fireHook, level]);
   const cancelTask = useCallback(() => { ++taskId.current; taskAbort.current?.abort(); taskAbort.current = null; setBusy(''); setVerifyingInitial(false); }, []);
   // 首次载入：localStorage 里的旧存档需要在 Worker 中重验证明后才替换默认工作区。
   useEffect(() => {
@@ -253,7 +268,7 @@ function Workshop() {
   };
 
   const changeLevel = (id: number) => {
-    if (id > unlocked || busy === '验证通关记录') return;
+    if (!isUnlocked(id, done) || busy === '验证通关记录') return;
     cancelTask(); setPage(0); setFailureOnly(false);
     setFitEpoch(epoch => epoch + 1);
     setWorkspace(w => ({ ...w, currentLevel: id }));
@@ -383,9 +398,12 @@ function Workshop() {
           : samples.findIndex(i => level.inputs.every(name => i[name] === judged.failure!.inputs[name]));
         if (index >= 0) { observeSample(index); setPage(Math.floor(index / 8)); }
         }
+        fireHook('onFirstFail', level);
       }
       if (judged.passed) {
+        const firstClear = workspace.proofs[current] === undefined;
         setWorkspace(w => ({ ...w, proofs: { ...w.proofs, [current]: clone(circuit) } }));
+        if (firstClear) fireHook('onFirstClear', level);
       }
       if (window.innerWidth < 1100) setTaskOpen(true);
     } catch (error) { if ((error as Error).name !== 'AbortError') { setBusy(''); notify((error as Error).message); } }
@@ -601,12 +619,12 @@ function Workshop() {
         {chapterGroups.map(group => <Fragment key={group.number}>
           <div className={`lesson-chapter ${group.number === level.chapter ? 'active' : ''}`}>
             <span>第 {group.number} 章</span><strong>{group.title}</strong>
-            <small>{String(group.lessons[0].id).padStart(2, '0')}–{String(group.lessons.at(-1)!.id).padStart(2, '0')}</small>
+            <small>{String(displayNumber(group.lessons[0].id)).padStart(2, '0')}–{String(displayNumber(group.lessons.at(-1)!.id)).padStart(2, '0')}</small>
           </div>
-          {group.lessons.map(item => <button key={item.id} className={`lesson ${item.id === current ? 'current' : ''}`} disabled={item.id > unlocked}
-            aria-label={`第 ${item.id} 关 ${item.title}`} aria-current={item.id === current ? 'step' : undefined} onClick={() => changeLevel(item.id)}>
+          {group.lessons.map(item => <button key={item.id} className={`lesson ${item.id === current ? 'current' : ''}`} disabled={!isUnlocked(item.id, done)}
+            aria-label={`第 ${displayNumber(item.id)} 关 ${item.title}`} aria-current={item.id === current ? 'step' : undefined} onClick={() => changeLevel(item.id)}>
             <span className={`lesson-number ${workspace.proofs[item.id] ? 'completed' : ''}`}>
-              {item.id > unlocked ? <LockKeyhole size={12} /> : String(item.id).padStart(2, '0')}
+              {!isUnlocked(item.id, done) ? <LockKeyhole size={12} /> : String(displayNumber(item.id)).padStart(2, '0')}
             </span>
             <span className="lesson-copy"><strong>{item.title}</strong><small>{item.caption}</small></span>
             {item.id === current && <ChevronRight size={15} />}
@@ -659,7 +677,7 @@ function Workshop() {
     <main className="main-workspace">
       <header className="workspace-header"><div className="workspace-location">
         <ToolButton label="查看关卡" onClick={() => setChapterOpen(true)}><Menu size={19} /></ToolButton>
-        <span className="mobile-brand">逻辑工坊</span><span className="header-chapter">第 {level.chapter} 章</span><ChevronRight size={14} /><strong>{level.title}</strong><span className="level-pill">{String(current).padStart(2, '0')}</span>
+        <span className="mobile-brand">逻辑工坊</span><span className="header-chapter">第 {level.chapter} 章</span><ChevronRight size={14} /><strong>{level.title}</strong><span className="level-pill">{String(displayNumber(current)).padStart(2, '0')}</span>
       </div><div className={`save-status ${saveStatus.includes('失败') ? 'save-error' : ''}`}><span />{saveStatus}</div>
         <div className="file-tools"><ToolButton label="导出存档" onClick={exportSave}><Download size={17} /></ToolButton><ToolButton label="导入存档" onClick={() => importInput.current?.click()}><Upload size={17} /></ToolButton></div>
         <input ref={importInput} type="file" accept="application/json,.json" hidden onChange={e => void importSave(e.target.files?.[0])} />
@@ -750,7 +768,7 @@ function Workshop() {
           <div className="task-tabs"><button className={panel === 'task' ? 'chosen' : ''} onClick={() => setPanel('task')}>任务</button><button className={panel === 'selection' ? 'chosen' : ''} onClick={() => setPanel('selection')}>属性</button>
             <button className="close-task tool-button" aria-label="关闭任务" onClick={() => setTaskOpen(false)}><X size={18} /></button></div>
           <div className="task-panel-scroll">
-            {panel === 'task' ? <><div className="task-eyebrow">关卡 {String(current).padStart(2, '0')}<span>{workspace.proofs[current] ? '已完成' : '进行中'}</span></div>
+            {panel === 'task' ? <><div className="task-eyebrow">关卡 {String(displayNumber(current)).padStart(2, '0')}<span>{workspace.proofs[current] ? '已完成' : '进行中'}</span></div>
               <h1>{level.title}</h1>
               {architecture && <ArchitecturePanel simulation={simulation} program={circuit.nodes.find(n => n.id === 'program' && n.type === 'ROM')} disabled={!!busy} onEdit={() => { setPlaying(false); setProgramId('program'); }} />}
               {programming && <ArchitecturePanel simulation={simulation} disabled={!!busy} onEdit={() => {}} />}
@@ -764,9 +782,9 @@ function Workshop() {
                 <button className="hint-button" disabled={hintCount === 3} onClick={() => setHints(h => ({ ...h, [current]: Math.min(3, (h[current] ?? 0) + 1) }))}><Lightbulb size={15} />{hintCount === 3 ? '提示已全部展开' : hintCount ? '下一条提示' : '展开提示'}<ChevronRight size={14} /></button>
               </div>
               <div className={`test-feedback ${resultCurrent && result?.passed ? 'passed' : resultCurrent && result ? 'not-passed' : ''}`} data-testid="test-feedback" aria-live="polite">
-                {resultCurrent && result ? result.passed ? <><CircleCheck size={23} /><strong>{testCount} / {testCount} {level.cases ? '测试集通过' : '全部通过'}</strong><p>{current === levels.length ? `全部 ${levels.length} 关已完成，可以导出你的作品。` : programming ? '程序通过公开测试，下一关已解锁。' : '电路正确，下一关已解锁。'}</p>
+                {resultCurrent && result ? result.passed ? <><CircleCheck size={23} /><strong>{testCount} / {testCount} {level.cases ? '测试集通过' : '全部通过'}</strong><p>{nextLevelId(current) === undefined ? `全部 ${levels.length} 关已完成，可以导出你的作品。` : programming ? '程序通过公开测试，下一关已解锁。' : '电路正确，下一关已解锁。'}</p>
                   {!programming && <button className="secondary-button save-component-button" onClick={() => openPackage('whole')}><Package size={14} />保存为组件</button>}
-                  {current < levels.length ? <button className="next-button" aria-label="下一关" onClick={() => changeLevel(current + 1)}>下一关<ArrowRight size={16} /></button>
+                  {nextLevelId(current) !== undefined ? <button className="next-button" aria-label="下一关" onClick={() => changeLevel(nextLevelId(current)!)}>下一关<ArrowRight size={16} /></button>
                     : <button className="next-button" onClick={exportSave}>导出我的作品<Download size={15} /></button>}</>
                   : <><CircleAlert size={22} /><strong>{result.error ? programming ? '检查程序与机器' : '检查电路连接' : '发现不一致'}</strong>{result.failure && <>{temporal && <p className="failure-scenario">{result.failure.scenarioLabel} · {programming ? '' : `第 ${(result.failure.stepIndex ?? 0) + 1} 步 · `}周期 {result.failure.cycle}</p>}{result.failure.program && <p className="failure-inputs">{result.failure.program.reason}<br />期望输出：{result.failure.program.expectedOutput.join(' → ')}<br />实际输出：{result.failure.program.actualOutput.join(' → ') || '尚无输出'}</p>}<p className="failure-inputs">{Object.entries(result.failure.inputs).map(([name, v]) => `${name} = ${v}`).join('，')}</p>
                     {level.outputPorts.filter(p => result.failure!.mismatches.includes(p.id)).map(p => <div key={p.id} className="failure-values"><span>{level.outputPorts.length > 1 ? `${p.label} ` : ''}期望 <b>{result.failure!.expectedOutputs[p.id]}</b></span><span>实际 <b>{result.failure!.actualOutputs[p.id]}</b></span></div>)}
@@ -797,7 +815,7 @@ function Workshop() {
         : workspace.workshop ?? createWorkshopCircuit()}
       library={workspace.library}
       teachingLibrary={teachingLibrary}
-      unlocked={unlocked}
+      done={done}
       editing={workshopEditing}
       onClose={() => setWorkshopOpen(false)}
       onDraft={handleWorkshopDraft}
@@ -817,6 +835,10 @@ function Workshop() {
         <table><thead><tr><th>Opcode</th><th>Name</th><th>Param</th><th>Imm</th><th>Effect</th></tr></thead><tbody>{instructionSet.map(instruction => <tr key={instruction.opcode}><td>{instruction.opcode}</td><td><strong>{instruction.name}</strong></td><td>{instruction.param}</td><td>{instruction.immediate}</td><td>{instruction.effect}</td></tr>)}</tbody></table>
         <p className="instruction-spec-note">Z 是零标志：最近一次写入 A 的结果为 0 时为 1，否则为 0；不写入 A 的指令不会更新它。控制器只在 Phase=2 执行有效指令；JZ 还要求 Z=1。ROM 编辑器中的指令字使用四位十六进制表示。</p>
       </div>
+    </section></div>}
+    {hookDialog && <div className="modal-backdrop" onClick={() => setHookDialog(null)}><section className="reset-dialog" role="dialog" aria-modal="true" aria-labelledby="hook-message-title" onClick={e => e.stopPropagation()}>
+      <h2 id="hook-message-title">{hookDialog.title}</h2><p>{hookDialog.body}</p>
+      <div><button autoFocus className="test-button" onClick={() => setHookDialog(null)}>知道了</button></div>
     </section></div>}
     {programId && circuit.nodes.find(n => n.id === programId && n.type === 'ROM') && <ProgramEditor key={`${current}:${programId}`} node={circuit.nodes.find(n => n.id === programId)!} activeProgram={programId === 'program' ? simulation.activeProgram : undefined} pc={simulation.values.PC} onClose={() => setProgramId(null)} onSave={words => { commit({ ...circuit, revision: circuit.revision + 1, nodes: circuit.nodes.map(n => { if (n.id !== programId) return n; const { programSource: _source, ...node } = n; return { ...node, words }; }) }); setProgramId(null); notify('ROM 程序已应用，运行状态已清零。'); }} />}
     {resetOpen && <div className="modal-backdrop" onClick={() => setResetOpen(false)}><section className="reset-dialog" role="dialog" aria-modal="true" aria-labelledby="reset-title" onClick={e => e.stopPropagation()}>

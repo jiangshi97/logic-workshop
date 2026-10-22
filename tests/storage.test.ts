@@ -145,6 +145,15 @@ it('keeps legacy canonical keys the code no longer produces while rebuilding kno
   expect(Object.keys(JSON.parse(serializeWorkspace(restored)).library)).toEqual(['architecture-mux1-renamed@2']);
 });
 
+it('round-trips one-shot hook trigger records and filters junk events', () => {
+  const state = createWorkspace();
+  expect(JSON.parse(serializeWorkspace(createWorkspace())).firedHooks).toBeUndefined();
+  state.firedHooks = { 45: ['onFirstClear', 'onEnter'] };
+  expect(parseWorkspace(serializeWorkspace(state), { verifyProofs: false }).firedHooks).toEqual({ 45: ['onFirstClear', 'onEnter'] });
+  const junk = JSON.stringify({ ...state, firedHooks: { 999: ['onEnter'], 45: ['nonsense', 'onFirstFail'], bad: ['onEnter'] } });
+  expect(parseWorkspace(junk, { verifyProofs: false }).firedHooks).toEqual({ 45: ['onFirstFail'] });
+});
+
 it('refuses saves written by a newer application with a dedicated message', () => {
   const state = createWorkspace();
   expect(() => parseWorkspace(JSON.stringify({ ...state, version: 8 }))).toThrow('更新版本');

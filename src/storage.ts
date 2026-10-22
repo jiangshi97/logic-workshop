@@ -9,10 +9,13 @@ import { judge } from './simulator';
 import { assemble } from './assembler';
 import { canonicalMachineLibrary, isProgrammingLevel, machineKeyOf, programmingMachine } from './machines';
 import { pruneDeletedComponents } from './componentManagement';
+import { levelPosition } from './progress';
+import { LEVEL_EVENTS, type LevelEvent } from './levelPack';
 import type { Circuit, CircuitGraph, CircuitNode, ComponentDefinition, ComponentLibrary, Inputs, NodeType, Port, Wire } from './contracts';
 
 export const STORAGE_KEY = 'logic-workshop.v1';
-/** 存档结构（version 7）：稀疏关卡草稿、通关证明、每关输入值、玩家组件库与可选的元件工坊草稿（levelId=0）。 */
+/** 存档结构（version 7）：稀疏关卡草稿、通关证明、每关输入值、玩家组件库与可选的元件工坊草稿（levelId=0）。
+ *  firedHooks 是关卡包钩子的一次性触发记录（v7 后期加法字段：老档缺省 = 全未触发，旧版本应用读到会忽略）。 */
 export interface Workspace {
   version: 7;
   currentLevel: number;
@@ -21,10 +24,11 @@ export interface Workspace {
   inputs: Record<number, Inputs>;
   library: ComponentLibrary;
   workshop?: Circuit;
+  firedHooks?: Record<number, LevelEvent[]>;
 }
 
 export function createWorkspace(): Workspace {
-  return { version: 7, currentLevel: 1, proofs: {}, library: canonicalMachineLibrary(),
+  return { version: 7, currentLevel: levels[0].id, proofs: {}, library: canonicalMachineLibrary(),
     circuits: Object.fromEntries(levels.map(level => [level.id, level.mode === 'program' ? programmingMachine(level.id) : createCircuit(level.id)])),
     inputs: Object.fromEntries(levels.map(level => [level.id, Object.fromEntries(level.inputs.map(name => [name, level.mode === 'program' && name === 'E' ? 1 : 0]))])) };
 }
@@ -227,8 +231,23 @@ export function parseWorkspace(text: string, options: { verifyProofs?: boolean }
     workspace.proofs = verified;
     unlocked = Math.min(levels.length, Object.keys(verified).length + 1);
   }
-  workspace.currentLevel = Number.isInteger(raw.currentLevel) && (raw.currentLevel as number) >= 1
-    && (raw.currentLevel as number) <= unlocked ? raw.currentLevel as number : unlocked;
+  // currentLevel 是关卡 id：合法 = 在目录内且位置落在解锁前沿之内；否则回落到前沿关。
+  // （基础目录 id 连续，与旧的 [1, unlocked] 数值区间完全等价；关卡包的稀疏 id 也按位置判定。）
+  const requestedPosition = Number.isInteger(raw.currentLevel) ? levelPosition(raw.currentLevel as number) : -1;
+  workspace.currentLevel = requestedPosition >= 0 && requestedPosition < unlocked
+    ? raw.currentLevel as number : levels[Math.min(unlocked, levels.length) - 1].id;
+  // 关卡钩子触发记录：只认目录内关卡与已知事件名，其余忽略（防重放；丢失最多导致一次性钩子再触发一次）。
+  if (raw.firedHooks !== undefined) {
+    const fired: Record<number, LevelEvent[]> = {};
+    for (const [key, events] of Object.entries(record(raw.firedHooks, '钩子触发记录格式无效。'))) {
+      if (!/^[1-9][0-9]*$/.test(key)) continue;
+      const id = Number(key);
+      if (!catalogue.has(id) || !Array.isArray(events)) continue;
+      const valid = events.filter((event): event is LevelEvent => (LEVEL_EVENTS as readonly string[]).includes(event as string));
+      if (valid.length) fired[id] = valid;
+    }
+    workspace.firedHooks = fired;
+  }
   if (raw.workshop !== undefined) workspace.workshop = parseWorkshopCircuit(raw.workshop, workspace.library);
   return workspace;
 }
@@ -279,6 +298,7 @@ export function serializeWorkspace(workspace: Workspace, space?: number) {
   return JSON.stringify({ version: workspace.version, currentLevel: workspace.currentLevel,
     circuits: circuits(workspace.circuits), proofs: circuits(workspace.proofs), inputs: workspace.inputs, library,
     ...(workspace.workshop ? { workshop: { levelId: 0, revision: workspace.workshop.revision, ...graph(workspace.workshop) } } : {}),
+    ...(workspace.firedHooks && Object.keys(workspace.firedHooks).length ? { firedHooks: workspace.firedHooks } : {}),
   }, null, space);
 }
 

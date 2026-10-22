@@ -2,12 +2,13 @@
 // （组合输入集/期望、时序场景帧、编程用例的条数与 sha1 摘要），保证编辑 JSON 不悄悄改变判题标准。
 // 期望值快照来自迁移前的数学闭包；UPDATE_SNAPSHOTS=1 npx vitest run tests/level-content.test.ts 重新生成。
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chapters, levels, testInputs } from '../src/levels';
-import { levelData } from '../src/levelData.generated';
+import { levelData, levelPackTags, levelSources } from '../src/levelData.generated';
+import { generatedLevelPacks } from '../src/levelPacks.generated';
 import { programmingCases, programmingReferenceSource } from '../src/programmingSpec';
 import type { Inputs, Outputs } from '../src/contracts';
 
@@ -75,10 +76,28 @@ describe('level content snapshot', () => {
     }
   });
 
-  it('keeps levelData.generated in sync with content/levels', () => {
-    const dir = fileURLToPath(new URL('../content/levels/', import.meta.url));
-    const files = readdirSync(dir).filter(name => name.endsWith('.json')).sort();
-    const fromDisk = files.map(name => JSON.parse(readFileSync(`${dir}/${name}`, 'utf8')));
-    expect(levelData).toEqual(fromDisk);
+  it('keeps levelData.generated in sync with content/levels and content/packs', () => {
+    const contentRoot = fileURLToPath(new URL('../content/', import.meta.url));
+    const files = readdirSync(join(contentRoot, 'levels')).filter(name => name.endsWith('.json')).sort();
+    const fromDisk = files.map(name => JSON.parse(readFileSync(join(contentRoot, 'levels', name), 'utf8')));
+    const packFolders = existsSync(join(contentRoot, 'packs'))
+      ? readdirSync(join(contentRoot, 'packs')).filter(name => statSync(join(contentRoot, 'packs', name)).isDirectory()).sort()
+      : [];
+    const expected: unknown[] = [...fromDisk];
+    const sources = files.map(name => `content/levels/${name}`);
+    const tags = files.map(() => '');
+    for (const folder of packFolders) {
+      const packLevels = join(contentRoot, 'packs', folder, 'levels');
+      if (!existsSync(packLevels)) continue;
+      for (const name of readdirSync(packLevels).filter(name => name.endsWith('.json')).sort()) {
+        expected.push(JSON.parse(readFileSync(join(packLevels, name), 'utf8')));
+        sources.push(`content/packs/${folder}/levels/${name}`);
+        tags.push(folder);
+      }
+    }
+    expect(levelData).toEqual(expected);
+    expect(levelSources).toEqual(sources);
+    expect(levelPackTags).toEqual(tags);
+    expect(generatedLevelPacks.map(entry => entry.folder)).toEqual(packFolders);
   });
 });

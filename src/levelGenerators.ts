@@ -6,7 +6,14 @@ import type { Inputs, Outputs, Port } from './contracts';
 import type { ScenarioSpec } from './levelSpec';
 import { architectureOracle, architecturePrograms, encodeInstruction } from './architectureSpec';
 
-export interface GeneratorContext { id: number; inputPorts: Port[]; outputPorts: Port[]; }
+export interface GeneratorContext {
+  id: number;
+  inputPorts: Port[];
+  outputPorts: Port[];
+  /** 关卡包生成器专用：所属包键与本包内编号（基础目录关卡不携带，老生成器无感）。 */
+  pack?: string;
+  localId?: number;
+}
 export type ScenarioGenerator = (context: GeneratorContext) => ScenarioSpec[];
 export type CaseGenerator = (context: GeneratorContext) => Inputs[];
 

@@ -1,11 +1,13 @@
 // 机器注册表：把此前关卡中构建出来的计算机登记为编程关可选的目标机器。
 // 每台机器自带指令子集（汇编器据此拒绝越权指令）、初始电路（ROM 清空）与规范依赖闭包
 // （存档不保存规范组件，载入时由代码重建——这是存档 v7 兼容设计的核心一环）。
-// 扩展 ISA 时在此追加描述符（如 computer-60：13 条指令），旧机器保持不动，旧档永不失效。
-import { architectureLibrary, architectureReferenceCircuit } from './architectureCircuits';
+// 扩展 ISA 的两条路：核心目录在此追加描述符（如 computer-60），或由关卡包在其 index.ts
+// 里注册（pack.machines，sourceLevel 写包内编号，装载时翻译成全局 id）——旧机器保持不动。
+import { architectureLibrary, architectureReferenceCircuit, dependencyClosure } from './architectureCircuits';
 import { assemble } from './assembler';
 import { programmingReferenceSource } from './programmingSpec';
 import { levels } from './levels';
+import { levelPacks, type LevelPack } from './levelPack';
 import type { Circuit, CircuitGraph, ComponentLibrary } from './contracts';
 
 // 编程关卡集合从目录中 mode='program' 的关卡派生（当前 45–56）：
@@ -33,12 +35,8 @@ const machineCircuit = (sourceLevel: number, levelId: number): Circuit => {
   const circuit = architectureReferenceCircuit(sourceLevel);
   return { ...circuit, levelId, nodes: circuit.nodes.map(n => n.id === 'program' ? { ...n, words: [] } : n) };
 };
-const closureOf = (sourceLevel: number): ComponentLibrary => {
-  const bank = architectureLibrary(), needed = new Set<string>();
-  const visit = (graph: CircuitGraph) => { for (const n of graph.nodes) if (n.type === 'COMPONENT' && !needed.has(n.componentKey!)) { needed.add(n.componentKey!); visit(bank[n.componentKey!].graph); } };
-  visit(architectureReferenceCircuit(sourceLevel));
-  return Object.fromEntries([...needed].sort().map(key => [key, bank[key]]));
-};
+const closureOf = (sourceLevel: number): ComponentLibrary =>
+  dependencyClosure(architectureLibrary(), architectureReferenceCircuit(sourceLevel));
 
 /** 第 44 关整机：十条指令（当前唯一注册的机器）。 */
 export const computer44: MachineDescriptor = {
@@ -48,8 +46,29 @@ export const computer44: MachineDescriptor = {
   library: () => closureOf(44),
 };
 
-/** 注册表即扩展点：新增计算机只需在此追加描述符（见 docs/code-guide.md）。 */
-export const machines: readonly MachineDescriptor[] = [computer44];
+/** 注册表即扩展点：新增计算机只需在此追加描述符（见 docs/code-guide.md），
+ *  或由关卡包在 content/packs/<包名>/index.ts 的 machines 数组里注册。 */
+export const machines: readonly MachineDescriptor[] = [computer44, ...packMachinesOf(levelPacks, levels)];
+{
+  const seen = new Set<string>();
+  for (const machine of machines) {
+    if (seen.has(machine.key)) throw new Error(`机器键 ${machine.key} 重复注册。`);
+    seen.add(machine.key);
+  }
+}
+
+/** 关卡包机器合并：sourceLevel 按包内编号书写，这里翻译成全局 id（idBase + 编号）
+ *  并确认目录中确有该关。导出为纯函数供测试。 */
+export function packMachinesOf(packs: readonly LevelPack[], catalogue: readonly { id: number }[]): MachineDescriptor[] {
+  return packs.flatMap(pack => (pack.machines ?? []).map(machine => {
+    if (!Number.isInteger(machine.sourceLevel) || machine.sourceLevel < 1)
+      throw new Error(`关卡包 ${pack.key} 的机器 ${machine.key} 的 sourceLevel 必须是包内正整数关卡号。`);
+    const sourceLevel = pack.idBase + machine.sourceLevel;
+    if (!catalogue.some(level => level.id === sourceLevel))
+      throw new Error(`关卡包 ${pack.key} 的机器 ${machine.key} 指向的来源关卡不存在（包内 ${machine.sourceLevel} → 全局 ${sourceLevel}）。`);
+    return { ...machine, sourceLevel };
+  }));
+}
 
 export function machineByKey(key: string | undefined): MachineDescriptor {
   if (key === undefined) return machines[0]; // 关卡未绑定机器时缺省取注册表第一台

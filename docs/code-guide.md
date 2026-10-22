@@ -27,15 +27,17 @@ src/
 ├─ netlist.ts                # 层级组件展开为扁平网表、组合环检测
 ├─ id.ts / vendor.d.ts / gates.ts # 随机 ID 生成 / digitaljs 类型声明 / 门型清单
 │
-├─ levels.ts                 # 关卡接口与聚合入口（含启动期关卡号守卫）
-├─ levelSpec.ts              # 关卡编写 API：LevelSpec 校验与编译（含编程用例注册表）
+├─ levels.ts                 # 关卡接口与聚合入口（基础目录 + 关卡包；chapters 合并）
+├─ levelSpec.ts              # 关卡编写 API：LevelSpec 校验与编译（含编程用例注册表、hooks 形状校验）
 ├─ levelExpr.ts              # 期望值表达式迷你语言（纯整数安全求值器）
-├─ levelRegistry.ts          # 声明式关卡的统一编译（数据来自 levelData.generated，npm run regen:levels 再生成）
-├─ levelGenerators.ts        # 命名场景/用例生成器：JSON 引用，编译期展开穷举判题数据（temporal/architecture 等）
+├─ levelRegistry.ts          # 目录编译 compileCatalogue：包 id 平移（+idBase）与跨关卡守卫
+├─ levelGenerators.ts        # 基础目录命名场景/用例生成器：JSON 引用，编译期展开穷举判题数据
+├─ levelPack.ts              # 关卡包扩展点汇总：LevelPack/钩子类型、生成器/钩子命名空间解析、包校验
+├─ progress.ts               # 进度与序号助手：解锁/已通关/下一关一律按目录位置（稀疏 id 兼容）
 ├─ architectureSpec.ts       # 指令集规格（编码/译码）、参考 ALU/控制器/整机状态机
-├─ architectureCircuits.ts   # 教学组件库（MUX/寄存器/ALU/PC/.../整机）与参考电路
+├─ architectureCircuits.ts   # 教学组件库（MUX/寄存器/ALU/PC/.../整机）与参考电路；导出 Builder DSL 与依赖闭包
 ├─ programmingSpec.ts        # 第 45–56 关的数学测试用例与参考汇编程序
-├─ programmingMachine.ts     # 编程关卡的固定 CPU 电路、依赖闭包与防篡改校验
+├─ programmingMachine.ts     # 机器注册表转发垫片（实现在 machines.ts）
 │
 ├─ simulator.ts              # 交互仿真（DigitalJS）与判题入口 judge()
 ├─ combinationalEvaluator.ts # 判题内核：把门级图编译成位槽数组指令序列
@@ -185,12 +187,15 @@ Worker 承担全部重活，主线程只做 UI：
 
 ## 8. 关卡内容组织
 
-- `levels.ts` 定义 `Level` 接口（接口端口、允许门型、三层提示、期望函数、模式）并聚合 `specLevels()`（按 id 排序）；`chapters` 为章节标题，模块加载时守卫关卡号唯一。
-- **全部 57 关都是声明式关卡**：`content/levels/*.json` 是纯数据（文案、端口、提示、期望值表达式/真值表/手写帧/生成器引用/编程用例），由 `levelRegistry.ts` 构建期装载、`levelSpec.ts` 运行时校验并编译成 `Level`（生成器引用在编译期由 `levelGenerators.ts` 展开）。期望值依然独立于任何电路或仿真器；`tests/level-content.test.ts` 的快照固化第 1–20 关全部穷举期望与全关卡判题数据摘要（sha1），防止悄悄改判题标准。作者指南见 [关卡编写指南](level-authoring.md)。
+- `levels.ts` 定义 `Level` 接口（接口端口、允许门型、三层提示、期望函数、模式、可选 hooks/pack）并聚合 `specLevels()`（按 id 排序）；`chapters` = 基础 7 章 + 各关卡包追加的标题。
+- **全部 57 个基础关卡都是声明式关卡**：`content/levels/*.json` 是纯数据（文案、端口、提示、期望值表达式/真值表/手写帧/生成器引用/编程用例），由 `levelRegistry.ts` 的 `compileCatalogue()` 构建期装载、`levelSpec.ts` 运行时校验并编译成 `Level`。期望值依然独立于任何电路或仿真器；`tests/level-content.test.ts` 的快照固化第 1–20 关全部穷举期望与全关卡判题数据摘要（sha1），防止悄悄改判题标准。作者指南见 [关卡编写指南](level-authoring.md)。
+- **关卡包（content/packs/&lt;包名&gt;/）是新增关卡的唯一入口**：包内 `levels/*.json` 放关卡、`index.ts` 导出 `LevelPack` 描述符（`src/levelPack.ts`：key / idBase / chapters / 生成器 / 钩子 / 机器）。生成脚本同时产出 `levelData.generated.ts`（含逐项对齐的 `levelSources` 与 `levelPackTags`）与 `levelPacks.generated.ts`，仍走"生成文件提交入库"路线。包关卡 JSON 的 `id` 仅本包内唯一，全局 id = `idBase + id`；`compileCatalogue` 守卫全局唯一、包区间不相交且整体在基础目录之上（保住"id 序 == 目录序"，教学组件 sourceLevel 等旧比较天然继续成立）。JSON 以字符串键引用包内 TS：生成器 `"包键/名字"`（裸名留给基础 `levelGenerators.ts`，老关卡零迁移）、钩子 `"hooks": { onEnter/onFirstClear/onFirstFail: "包键/名字" }`（`levelSpec` 只校验形状，运行期 `resolveHook` 解析）。`content/packs/example/` 是常驻的最小模板（0 关卡，打通 tsc/Vite/Playwright 对 content TS 的真实编译链路）。
+- **进度与序号（progress.ts）**：解锁链沿目录**位置**推进——`displayNumber/isUnlocked/isCleared/nextLevelId/frontierLevelId` 全部按位置计算，`makeProgress` 工厂供测试注入稀疏目录。基础目录 1..57 连续（位置+1 == id），对现有存档与显示逐字节等价；关卡包的稀疏 id（如 101）显示为第 58 关。`storage.ts` 的 `currentLevel` 校验同改位置语义。
+- **关卡钩子（App.tsx + levelPack.ts）**：`HookContext { level, notify, showMessage }` 是钩子的全部副作用通道；`fireHook` 在 onEnter（首次进入）/onFirstClear（首次通关，挂点即 runTest 的 proof 写入）/onFirstFail（首次判题失败）触发，一次性记录持久化在 `Workspace.firedHooks`（v7 加法字段，老档缺省 = 全未触发），未知钩子名降级为 toast 报错。
 - 第 21–44 关的时序场景帧（`TestSequence`：逐步 `{inputs, tick, expectedOutputs}`，覆盖保持、复位优先级、同沿读写旧值、回绕等细节）与第 33/34/40 关的公开用例集都以 `"generator": "名字"` 引用 `levelGenerators.ts`，编译期展开并复用手写数据的同一校验——JSON 保持人可编写的小体积，穷举数据由独立参考状态机（`temporalOracle` / `architectureOracle`）产生；第 45–56 关的编程用例与参考源是 JSON 里的紧凑数据。`defineLevel()`（同一编译器的 TS 包装）供程序化组装 spec 使用，不进入目录聚合。
 - `architectureSpec.ts` 是 ISA 唯一权威：16 位指令 = Opcode[15:12] · Param[11:8] · Imm[7:0]，10 条指令；`architectureOracle` 是完整参考 CPU（三阶段状态机）；`architecturePrograms` 是第 44 关判题用的 10 个测试程序。
 - `architectureCircuits.ts` 用 `Builder` DSL（`gate/and/or/split/join/mux/reg/dff/component...`）生成 23 个可查看的教学组件（mux1–16、register1–16、adder8、alu、registers、pc、decode、phase、controller、datapath、fetch、memory、computer）与第 33–44 关参考电路。注意 `architectureLibrary()` 每次返回全新深拷贝，调用方可安全保存/修改自己的副本。
-- **机器注册表（machines.ts）**：`MachineDescriptor { key, name, sourceLevel, instructions, circuit(levelId), library() }` 描述「之前关卡中构建的计算机」，`machines` 数组即扩展点（当前仅 `computer-44`，10 条指令）。编程关草稿由 `machineForLevel(id).circuit(id)` 生成（清空 ROM 的整机）；`machineKeyOf(circuit)` 按规范化图（`stable()` 排序键、忽略位置与 ROM 字）识别草稿当前持有哪台机器，`validateProgrammingMachine` 与注册表中任一机器逐字节等价即合法——判题本就对草稿电路跑门级仿真，天然按所选机器判定。汇编器 `assemble`/`disassemble` 接受可选机器参数，源码只能使用该机 `instructions` 子集（报「{机名}不支持指令 X」）；编程面板顶部的机器选择器（选项按通关 `sourceLevel` 解锁，单台时禁用）切换时保留能重新汇编的 `programSource`，汇编不过则清空 ROM 待重新应用。`programmingMachine.ts` 保留为纯转发垫片；关卡 JSON 的 `program.machine`（可选，默认注册表第一台）为未来关卡绑定新机预留。
+- **机器注册表（machines.ts）**：`MachineDescriptor { key, name, sourceLevel, instructions, circuit(levelId), library() }` 描述「之前关卡中构建的计算机」，`machines` 数组即扩展点（当前仅 `computer-44`，10 条指令；关卡包可经 `pack.machines` 追加——`sourceLevel` 写包内编号，`packMachinesOf` 装载时翻译成全局 id 并校验存在，键冲突启动期报错）。编程关草稿由 `machineForLevel(id).circuit(id)` 生成（清空 ROM 的整机）；`machineKeyOf(circuit)` 按规范化图（`stable()` 排序键、忽略位置与 ROM 字）识别草稿当前持有哪台机器，`validateProgrammingMachine` 与注册表中任一机器逐字节等价即合法——判题本就对草稿电路跑门级仿真，天然按所选机器判定。汇编器 `assemble`/`disassemble` 接受可选机器参数，源码只能使用该机 `instructions` 子集（报「{机名}不支持指令 X」）；编程面板顶部的机器选择器（选项按通关 `sourceLevel` 解锁，单台时禁用）切换时保留能重新汇编的 `programSource`，汇编不过则清空 ROM 待重新应用。`programmingMachine.ts` 保留为纯转发垫片；关卡 JSON 的 `program.machine`（可选，默认注册表第一台）为未来关卡绑定新机预留。包内机器的电路与闭包用 `architectureCircuits.ts` 导出的 `Builder` DSL 与 `dependencyClosure()` 构建；`canonicalMachineLibrary()` 自动并入包机器闭包，存档 v7 的"规范组件代码重建"因此天然覆盖新组件。
 
 ## 9. 组件系统（components.ts / componentManagement.ts）
 

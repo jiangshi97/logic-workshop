@@ -88,6 +88,12 @@ describe('level spec compilation', () => {
     programCaseRegistry.delete(990);
   });
 
+  it('accepts namespaced hook declarations and carries them onto the Level', () => {
+    const level = compileLevelSpec({ ...spec101, hooks: { onEnter: 'example/intro', onFirstClear: 'example/celebrate' } });
+    expect(level.hooks).toEqual({ onEnter: 'example/intro', onFirstClear: 'example/celebrate' });
+    expect(compileLevelSpec(spec101).hooks).toBeUndefined();
+  });
+
   it('accepts typed specs through defineLevel with the same validation', () => {
     const level = defineLevel({ ...spec101, combinational: { expect: { Y: 'A & B' } } } as never);
     expect(level.expectedOutputs({ A: 1, B: 1 })).toEqual({ Y: 1 });
@@ -112,6 +118,9 @@ describe('level spec rejection', () => {
     rejects({ ...spec101, inputs: [['A', 1]], outputs: [['A', 1]] }, /重复/);
     rejects({ ...spec101, allowed: ['NAND', 'LASER'] }, /allowed/);
     rejects({ ...spec101, defaultProgram: [0x10000] }, /defaultProgram/);
+    rejects({ ...spec101, hooks: { onWin: 'example/x' } }, /hooks 的键/);
+    rejects({ ...spec101, hooks: { onEnter: 'celebrate' } }, /包键\/钩子名/);
+    rejects({ ...spec101, hooks: 'nope' }, /hooks 必须是对象/);
   });
 
   it('rejects missing or duplicated mode sections', () => {

@@ -1,8 +1,10 @@
-// 关卡目录与聚合入口。全部关卡均为 content/levels/ 下的 JSON 声明式定义，
-// 由 levelRegistry 校验编译接入（期望值是纯整数表达式/物化帧数据，独立于任何电路或仿真器）；
-// 固定机器与教学组件电路仍在 architectureCircuits / programmingMachine 中以代码维护。
-// 新增关卡写 JSON 追加在最高号之后（见 docs/level-authoring.md），聚合时按 id 排序。
+// 关卡目录与聚合入口：基础目录 content/levels/*.json 与各关卡包 content/packs/*/*.json
+// 一并经 levelRegistry 校验编译接入（期望值是纯整数表达式/物化帧数据，独立于任何电路或仿真器）。
+// 新增关卡一律写进关卡包（见 docs/level-authoring.md"关卡包"一节），基础 57 关保持冻结；
+// 关卡 id 只是稳定身份（包内编号 + 包 idBase），展示序号与解锁进度按目录位置计算（progress.ts）。
 import type { GateType, Inputs, Outputs, Port, TestSequence } from './contracts';
+import type { LevelHooks } from './levelPack';
+import { levelPacks } from './levelPack';
 import { specLevels } from './levelRegistry';
 export type { GateType, Inputs } from './contracts';
 
@@ -27,14 +29,17 @@ export interface Level {
   defaultProgram?: number[];
   /** 编程关绑定的目标计算机（machines.ts 注册表键）；缺省取注册表第一台。 */
   machine?: string;
+  /** 所属关卡包键（levelPack.ts）；基础目录关卡无此字段。 */
+  pack?: string;
+  /** 关卡钩子声明（"包键/钩子名"），事件期由 App 经 levelPack 注册表解析触发。 */
+  hooks?: LevelHooks;
 }
 
-export const chapters = ['信号与逻辑门', '选择与分配', '多位信号', '组合运算', '状态与时间', '计算机架构', '编程应用'];
+const baseChapters = ['信号与逻辑门', '选择与分配', '多位信号', '组合运算', '状态与时间', '计算机架构', '编程应用'];
+/** 章节标题 = 基础 7 章 + 各关卡包追加（关卡包扩展点之一）。 */
+export const chapters = [...baseChapters, ...levelPacks.flatMap(pack => pack.chapters ?? [])];
 
-export const levels: Level[] = [...specLevels()].sort((left, right) => left.id - right.id);
-// 启动期守卫：关卡号必须唯一（排序后重复即相邻），防止两个 JSON 文件撞号。
-if (levels.some((level, index) => index > 0 && level.id === levels[index - 1].id))
-  throw new Error('关卡编号必须唯一，请检查 content/levels 下的关卡文件。');
+export const levels: Level[] = specLevels();
 
 export function getLevel(id: number): Level {
   const level = levels.find(level => level.id === id);

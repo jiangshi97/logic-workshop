@@ -1,43 +1,50 @@
 # 关卡编写指南（LevelSpec / JSON）
 
-本文面向要给「逻辑工坊」新增关卡的作者。**全部 57 关都用这里的格式编写**（`content/levels/*.json`）：
+本文面向要给「逻辑工坊」新增关卡的作者。**全部 57 个基础关卡都用这里的格式编写**（`content/levels/*.json`）：
 文案、端口、提示、判题期望（表达式 / 帧时间线 / 数学用例）全部是数据，不需要触碰任何判题或仿真代码。
 固定机器与教学组件的**电路**（第 44 关整机、`architecture-*` 教学组件）仍以代码维护，
 那是元件库，不是关卡定义。
 
-- 目录：`content/levels/`，文件名 `三位关卡号-英文短名.json`（如 `015-half-adder.json`），聚合按 `id` 排序。
-- 加载：`npm run regen:levels` 由 `content/levels/*.json` 生成 `src/levelData.generated.ts`（纯 TS 静态导入，
-  Vite/vitest/Playwright 通用），`src/levelRegistry.ts` 统一校验编译；忘记再生成时测试会直接报出。
+**新增关卡一律写进"关卡包"**（`content/packs/<包名>/`，见下文[关卡包](#关卡包新增关卡的入口)一节）：
+关卡 JSON、专属生成器/钩子/新计算机的 TypeScript 全部放在包目录里，核心代码零修改。
+基础目录 `content/levels/` 保持冻结——不要在里面追加或改动关卡。
+
+- 目录：基础 `content/levels/*.json` + 各包 `content/packs/*/levels/*.json`，文件名 `编号-英文短名.json`，聚合按 `id` 排序。
+- 加载：`npm run regen:levels` 扫描两个目录，生成 `src/levelData.generated.ts` 与 `src/levelPacks.generated.ts`
+  （纯 TS 静态导入，Vite/vitest/Playwright 通用），`src/levelRegistry.ts` 统一校验编译；忘记再生成时测试会直接报出。
 - 校验：`src/levelSpec.ts` 的 `compileLevelSpec()` 做全部运行时校验（结构、端口、位宽、表达式、取值范围），
-  任何错误都会抛出带关卡号与文件名的中文信息，`npm test` 会在测试阶段第一时间暴露。
+  任何错误都会抛出带关卡号与文件路径的中文信息，`npm test` 会在测试阶段第一时间暴露。
 - 判题：编译产物就是内部 `Level` 对象，判题/仿真/UI 完全无感；期望值仍是**独立数学定义**，不经任何电路。
 
 ## 快速开始
 
-新增一关只需四步：
+新增一关只需五步：
 
-1. 在 `content/levels/` 新建 `058-my-level.json`（关卡号必须全局唯一且大于现有最大号）。
-2. 填入下方任意一个完整示例的结构并改成你的内容。
-3. 运行 `npm run regen:levels` 重新生成 `src/levelData.generated.ts`（编译期静态导入，Vite/vitest/Playwright 通用）。
-4. 运行 `npm test`——校验错误、关卡号冲突、期望值快照变化、忘记再生成都会在这里报出来；再 `npm run dev` 试玩。
+1. 新建（或复用）一个关卡包目录 `content/packs/我的包名/`，包内新建 `levels/001-my-level.json`。
+2. 填入下方任意一个完整示例的结构并改成你的内容（`id` 只要在**本包内**唯一即可，从 1 编起）。
+3. 在包的 `index.ts` 里登记包描述符（`key` = 文件夹名、`idBase` 一个固定正整数、可选的章节与扩展点，
+   抄 `content/packs/example/index.ts` 即可）。
+4. 运行 `npm run regen:levels` 重新生成两个生成文件（编译期静态导入，Vite/vitest/Playwright 通用）。
+5. 运行 `npm test`——校验错误、编号冲突、区间相交、期望值快照变化、忘记再生成都会在这里报出来；再 `npm run dev` 试玩。
 
-追加关卡建议 `chapter` 填 7（编程应用，列表末尾），除非内容确实属于更早的章节；
+追加关卡建议 `chapter` 填 7（编程应用，列表末尾）或在包里声明新章节（编号接在基础 7 章之后）；
 侧栏按章节分组展示，编号很大的关卡放在早期章节组里会显得突兀。
 
 ## 字段参考
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `id` | 正整数 | ✓ | 关卡号，全局唯一。新关卡追加在现有最高号之后（当前 57+），聚合时按 id 排序 |
+| `id` | 正整数 | ✓ | 基础目录：全局唯一且按 id 排序；关卡包：**仅本包内唯一**，全局 id = `idBase + id`（见关卡包一节） |
 | `title` / `caption` | string | ✓ | 名称与副标题（侧栏/标题栏展示） |
 | `goal` | string | ✓ | 任务描述正文 |
 | `formula` | string | ✓ | 数学公式（如 `Sum = A ⊕ B`） |
-| `chapter` | 1–7 | ✓ | 章节号；新增章节需同步扩 `levels.ts` 的 `chapters` 数组 |
+| `chapter` | 正整数 | ✓ | 章节号；上限 = 基础 7 章 + 各包追加的章节数（编译期校验） |
 | `inputs` / `outputs` | `[端口名, 位宽][]` | ✓ | 接口端口；端口名是合法标识符，不可用保留字 `div`/`mod`，位宽 1–32 |
 | `allowed` | 门型数组 | — | 本关可用门型。省略时：1–20 号按解锁表推导，其余取全部门型 |
 | `hints` | string[3] | ✓ | 恰好三条递进提示 |
 | `rewardName` | string | — | 通关后可把整关电路打包成组件的默认命名 |
 | `defaultProgram` | number[] | — | ROM 初始指令字（最多 256 个 16 位字） |
+| `hooks` | 对象 | — | 关卡钩子声明（仅关卡包有意义）：`{ "onEnter" / "onFirstClear" / "onFirstFail": "包名/钩子名" }`，见关卡包一节 |
 | `combinational` / `sequential` / `program` | 对象 | 三选一 | 判题模式段，必须恰好提供一个 |
 
 ## 表达式语言（组合关期望值）
@@ -186,13 +193,100 @@ JSON 只保留人写的内容与一个名字，编译期由 `src/levelGenerators
 （`src/machines.ts`）中的某台计算机：初始电路用该机的整机、汇编源只能使用该机支持的指令子集。
 省略时默认绑定注册表第一台；值必须是注册表里已存在的 key，否则 `levelSpec` 校验报错。
 玩家在通关该机的 `sourceLevel` 后，可在编程面板顶部的机器选择器中切换已解锁的计算机。
+**新计算机也可以由关卡包注册**（见下节 `machines` 扩展点）。
+
+## 关卡包：新增关卡的入口
+
+一个关卡包 = `content/packs/<包名>/` 一个目录，承载一捆可独立新增的内容：
+
+```
+content/packs/我的扩展/
+  index.ts        # 包描述符（唯一必需文件）：key / idBase / chapters / 各扩展点
+  levels/*.json   # 关卡数据（格式与上文完全相同；id 为包内编号）
+  其余 TS 自由组织 # 生成器、钩子、机器电路、参考实现……index.ts 引它们
+```
+
+`index.ts` 导出一个 `pack: LevelPack` 描述符（类型见 `src/levelPack.ts`）：
+
+```ts
+import type { LevelPack } from '../../../src/levelPack';
+
+export const pack: LevelPack = {
+  key: '我的扩展',      // 必须与文件夹同名；JSON 里的引用都用它做命名空间（"我的扩展/xxx"）
+  idBase: 100,          // 包内关卡的全局 id = idBase + JSON id。选一个远离 57 的固定值，永不改动
+  chapters: ['指令集扩展'],  // 可选：追加章节（编号接在基础 7 章之后）
+  // 以下全部可选，按需注册：
+  // scenarioGenerators: new Map([['场景生成器名', fn]]),
+  // caseGenerators: new Map([['用例生成器名', fn]]),
+  // machines: [新计算机描述符（sourceLevel 写包内编号）],
+  // hooks: new Map([['钩子名', fn]]),
+};
+```
+
+### 编号规则（不用关心全局计数）
+
+- 关卡 JSON 的 `id` **只需在本包内唯一**，从 1 编起、允许跳号；全局 id 由 `idBase + id` 推导。
+- `idBase` 是一次性决定：必须使包内全部关卡都大于基础目录最大关卡号（57），且与其他包的区间不相交
+  ——编译期守卫（`src/levelRegistry.ts`）违反即报错并列出冲突双方。相邻包留出足够间隔（如 100 / 200）。
+- 存档、判题、解锁全部使用推导后的全局 id，**稳定不随版本变化**（所以 idBase 定了就不要改）。
+- 侧栏显示的"第 N 关"、解锁进度、"下一关"一律按**目录位置**计算（`src/progress.ts`），
+  与 id 数值无关——全局 id 101 的关卡显示为第 58 关。
+
+### JSON 引用包内 TypeScript 的三种方式
+
+沿用 `program.machine` 的惯例：JSON 只写字符串键，编译期校验形状，运行期向注册表解析。
+
+1. **生成器**（穷举判题数据，见上文生成器一节）：
+
+   ```json
+   "sequential": { "generator": "我的扩展/场景生成器名" }
+   "combinational": { "cases": { "generator": "我的扩展/用例生成器名" } }
+   ```
+
+   裸名（如 `"temporal"`）保留给基础目录的 `levelGenerators.ts`。生成器收到
+   `{ id: 全局id, pack, localId, inputPorts, outputPorts }` 上下文，按 `localId` 分派即可。
+
+2. **钩子**（事件驱动的特殊行为，如"第一次通关后执行特殊行为"）：
+
+   ```json
+   "hooks": {
+     "onEnter":      "我的扩展/开场白",
+     "onFirstClear": "我的扩展/通关彩蛋",
+     "onFirstFail":  "我的扩展/鼓励"
+   }
+   ```
+
+   三个事件各自**至多触发一次**（触发记录随存档持久化，导入/刷新不重放）：
+   `onEnter` 首次进入该关；`onFirstClear` 该关第一次通过判题；`onFirstFail` 该关第一次判题失败。
+   钩子是普通函数，只能经上下文 API 产生可见效果：
+
+   ```ts
+   import type { HookContext } from '../../../src/levelPack';
+   const 通关彩蛋 = ({ level, showMessage }: HookContext) =>
+     showMessage('新指令解锁', `「${level.title}」通关！接下来可以试试 AND 指令。`);
+   ```
+
+3. **机器**：编程关的 `program.machine` 填包内注册的机器 key。包机器的 `sourceLevel` 写**包内编号**，
+   装载时自动翻译成全局 id；玩家通关来源关后即在机器选择器中解锁。机器的整机电路与依赖闭包
+   在包内用 `architectureCircuits.ts` 导出的 `Builder` DSL 与 `dependencyClosure()` 构建。
+
+### 包规则（防止踩到装载链路）
+
+- `index.ts` 顶层只组装描述符，**不要调用** `levels` / `machines` 模块的函数——模块求值期关卡目录尚未就绪；
+  机器的 `circuit()` / `library()` 本来就是回调，在回调里调用没问题。
+- 生成器与钩子不得依赖 `levels` 目录（生成器在编译期触发，钩子只拿得到传入的 level）。
+- 对 `src/machines.ts` 只做 `import type`（防运行时循环依赖）；其余核心模块随意。
+- 包内自定义组件的键避开基础目录的 `architecture-*` 前缀，防止与规范教学组件同名覆盖。
+
+`content/packs/example/` 是一个始终在线的最小模板（0 关卡），生成器/钩子的完整写法直接抄它。
 
 ## 工作流与守卫
 
-- `npm test`：JSON 校验、关卡号唯一、章节/提示/端口不变量，以及 `tests/level-content.test.ts` 的内容快照——
-  第 1–20 关固化**全部穷举期望值**，所有关卡固化判题数据摘要（输入集/场景帧/编程用例的条数与 sha1）。
-  改动**已有**关卡判题数据时快照会失败，确认是设计意图后用
+- `npm test`：JSON 校验、全局编号唯一、包区间不相交、章节/提示/端口不变量，以及 `tests/level-content.test.ts`
+  的内容快照与生成文件同步检查——第 1–20 关固化**全部穷举期望值**，所有关卡固化判题数据摘要
+  （输入集/场景帧/编程用例的条数与 sha1）。改动**已有**关卡判题数据时快照会失败，确认是设计意图后用
   `UPDATE_SNAPSHOTS=1 npx vitest run tests/level-content.test.ts` 重新生成。
+  `tests/level-packs.test.ts` 覆盖关卡包守卫（idBase 推导/区间相交/机器翻译）与生成器/钩子解析。
 - `npm run dev` 试玩；通关、判题、波形、提示对任意模式的关卡完全同构。
 
 ## TS 入口（程序化场景）

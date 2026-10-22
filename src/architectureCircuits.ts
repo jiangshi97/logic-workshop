@@ -11,8 +11,9 @@ const key = (id: string) => `architecture-${id}@1`;
 const ports = (spec: Spec): Port[] => spec.map(([id, bits]) => ({ id, label: id, bits }));
 
 /** Small, inspectable gates and state cells; component interfaces are real graph boundaries. */
-/** 电路搭建 DSL：gate/not/and/or/split/join/mux/reg/dff/component 等原语，产出标准 CircuitGraph。 */
-class Builder {
+/** 电路搭建 DSL：gate/not/and/or/split/join/mux/reg/dff/component 等原语，产出标准 CircuitGraph。
+ *  导出供关卡包在其目录内构建新机器的电路（见 src/levelPack.ts 与 docs/level-authoring.md）。 */
+export class Builder {
   graph: CircuitGraph = { nodes: [], wires: [] };
   count = 0;
   constructor(readonly inputs: Spec, readonly outputs: Spec) {
@@ -190,6 +191,22 @@ function buildLibrary(): ComponentLibrary {
 
 /** Fresh deterministic definitions; callers may safely save, edit or expand their own copy. */
 export function architectureLibrary(): ComponentLibrary { return buildLibrary(); }
+
+/** 依赖闭包：从 bank 里收集 graph（递归展开）引用到的全部组件定义。
+ *  关卡包机器的 library() 用它对自己的组件库与整机图求闭包。 */
+export function dependencyClosure(bank: ComponentLibrary, graph: CircuitGraph): ComponentLibrary {
+  const needed = new Set<string>();
+  const visit = (target: CircuitGraph) => {
+    for (const node of target.nodes) if (node.type === 'COMPONENT' && !needed.has(node.componentKey!)) {
+      const definition = bank[node.componentKey!];
+      if (!definition) throw new Error(`组件 ${node.componentKey} 不在组件库中。`);
+      needed.add(node.componentKey!);
+      visit(definition.graph);
+    }
+  };
+  visit(graph);
+  return Object.fromEntries([...needed].sort().map(key => [key, bank[key]]));
+}
 
 const lessonModules: Record<number, string> = { 33: 'addsub', 34: 'alu', 35: 'registers', 36: 'pc', 37: 'decode', 39: 'phase', 40: 'controller', 42: 'output', 43: 'datapath' };
 

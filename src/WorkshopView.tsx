@@ -13,6 +13,7 @@ import { addGate, addComponent, getPorts, connect, canConnect, createWorkshopCir
 import type { ComponentDefinition, ComponentLibrary, GateType, Inputs } from './contracts';
 import { encapsulateSelection, expandComponent, packageCircuit } from './components';
 import { activeVariant, groupComponentFamilies, type ComponentFamily } from './libraryGrouping';
+import { isCleared } from './progress';
 import { useSimulation } from './workerClient';
 import { createId } from './id';
 import { CircuitNodeView, GateSymbol, nodeDimensions, type FlowNode } from './CircuitNode';
@@ -41,8 +42,8 @@ interface WorkshopViewProps {
   draft: Circuit;
   library: ComponentLibrary;
   teachingLibrary: ComponentLibrary;
-  /** 已解锁到的关卡号，用于过滤教学组件。 */
-  unlocked: number;
+  /** 已通关的关卡数，用于过滤教学组件（来源关卡已通关才可用）。 */
+  done: number;
   editing?: ComponentDefinition | null;
   onClose: () => void;
   onDraft: (circuit: Circuit) => void;
@@ -51,7 +52,7 @@ interface WorkshopViewProps {
 }
 
 function WorkshopCanvas(props: WorkshopViewProps) {
-  const { library, teachingLibrary, unlocked, editing, onClose, onDraft, onLibrary, notify } = props;
+  const { library, teachingLibrary, done, editing, onClose, onDraft, onLibrary, notify } = props;
   const [circuit, setCircuit] = useState<Circuit>(props.draft);
   const [history, setHistory] = useState<{ past: Circuit[]; future: Circuit[] }>({ past: [], future: [] });
   const [selection, setSelection] = useState<{ nodes: string[]; wires: string[] }>({ nodes: [], wires: [] });
@@ -127,7 +128,7 @@ function WorkshopCanvas(props: WorkshopViewProps) {
       const include = (dependency: string) => {
         if (target[dependency]) return;
         const block = teachingLibrary[dependency];
-        if (!block || (block.sourceLevel ?? 0) >= unlocked) throw new Error('先完成这个教学组件的来源关卡。');
+        if (!block || (block.sourceLevel !== undefined && !isCleared(block.sourceLevel, done))) throw new Error('先完成这个教学组件的来源关卡。');
         target[dependency] = clone(block);
         block.dependencies.forEach(include);
       };
@@ -267,7 +268,8 @@ function WorkshopCanvas(props: WorkshopViewProps) {
   };
 
   const selectedNode = circuit.nodes.find(n => selection.nodes.length === 1 && n.id === selection.nodes[0]);
-  const teachingEntries = Object.entries(teachingLibrary).filter(([, definition]) => (definition.sourceLevel ?? 0) < unlocked);
+  const teachingEntries = Object.entries(teachingLibrary).filter(([, definition]) =>
+    definition.sourceLevel === undefined || isCleared(definition.sourceLevel, done));
   const playerEntries = Object.entries(library).filter(([, definition]) => !definition.deleted && !teachingLibrary[key0(definition)]);
   // 我的组件 / 教学组件按家族分组：多位宽家族顶部给一个小选择框切换位宽，下方列出该位宽的版本。
   const playerFamilies = groupComponentFamilies(playerEntries.map(([key, definition]) => ({ key, definition })));
