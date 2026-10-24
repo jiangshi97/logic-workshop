@@ -65,15 +65,17 @@ describe('compileCatalogue', () => {
 });
 
 describe('the shipped example pack and extension resolvers', () => {
-  it('ships the example pack with one sample level above the frozen base catalogue', () => {
-    expect(generatedLevelPacks.map(entry => entry.folder)).toEqual(['example']);
-    expect(levelPacks.map(pack => pack.key)).toEqual(['example']);
+  it('ships pack levels above the frozen base catalogue', () => {
+    expect(generatedLevelPacks.map(entry => entry.folder)).toEqual(['useful-computer']);
+    expect(levelPacks.map(pack => pack.key)).toEqual(['useful-computer']);
     const base = levels.filter(level => level.pack === undefined);
     expect(base.map(level => level.id)).toEqual(Array.from({ length: 56 }, (_, index) => index + 1));
-    const shipped = levels.filter(level => level.pack === 'example');
-    expect(shipped.map(level => level.id)).toEqual([901]); // idBase 900 + 包内 1 号
-    expect(shipped[0].hooks).toEqual({ onFirstClear: 'example/celebrate', onFirstHint: 'example/nudge', onEveryTest: 'example/coach' });
-    expect(chapters).toHaveLength(7); // 示例关卡复用第 7 章，包未追加章节
+    const shipped = levels.filter(level => level.pack === 'useful-computer');
+    expect(shipped.map(level => level.id)).toEqual([921]); // idBase 920 + 包内 1 号
+    expect(shipped[0].chapter).toBe(8); // 包声明的“指令集扩展”接在基础 7 章之后
+    expect(shipped[0].hooks).toEqual({ onEnter: 'useful-computer/first-into-uc' });
+    expect(shipped[0].cases!()).toHaveLength(13683); // 全 A × 边界 B × Op 0..5 + 3 条非法 Op
+    expect(chapters).toHaveLength(8); // useful-computer 追加 1 章
     expect(machines.map(machine => machine.key)).toEqual(['computer-44']);
   });
 
@@ -89,11 +91,12 @@ describe('the shipped example pack and extension resolvers', () => {
     expect(resolveScenarioGenerator('temporal')).toBeTypeOf('function');
     expect(resolveCaseGenerator('alu-cases')).toBeTypeOf('function');
     expect(resolveScenarioGenerator('alu-cases')).toBeUndefined();
-    expect(resolveScenarioGenerator('example/hold')).toBeTypeOf('function');
-    expect(resolveScenarioGenerator('example/nope')).toBeUndefined();
-    expect(resolveHook('example/celebrate')).toBeTypeOf('function');
-    expect(resolveHook('celebrate')).toBeUndefined();
-    expect(resolveHook('example/nope')).toBeUndefined();
+    expect(resolveScenarioGenerator('useful-computer/hold')).toBeTypeOf('function');
+    expect(resolveScenarioGenerator('useful-computer/nope')).toBeUndefined();
+    expect(resolveCaseGenerator('useful-computer/alu6-cases')).toBeTypeOf('function');
+    expect(resolveHook('useful-computer/first-into-uc')).toBeTypeOf('function');
+    expect(resolveHook('first-into-uc')).toBeUndefined();
+    expect(resolveHook('useful-computer/nope')).toBeUndefined();
   });
 });
 

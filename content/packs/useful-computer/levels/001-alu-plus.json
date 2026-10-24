@@ -1,0 +1,72 @@
+{
+  "id": 1,
+  "title": "新八位 ALU",
+  "caption": "选择六种运算",
+  "goal": "Op=0 加、1 减、2 AND、3 XOR、4 OR、5 NOT。逻辑运算时 Carry 与 Borrow 为 0；Z 始终反映 Y。",
+  "formula": "Y=ALU(A,B,Op)",
+  "chapter": 8,
+  "inputs": [
+    [
+      "A",
+      8
+    ],
+    [
+      "B",
+      8
+    ],
+    [
+      "Op",
+      4
+    ]
+  ],
+  "outputs": [
+    [
+      "Y",
+      8
+    ],
+    [
+      "Carry",
+      1
+    ],
+    [
+      "Borrow",
+      1
+    ],
+    [
+      "Z",
+      1
+    ]
+  ],
+  "allowed": [
+    "NAND",
+    "NOT",
+    "AND",
+    "OR",
+    "XOR",
+    "XNOR",
+    "SPLIT",
+    "JOIN",
+    "CONST",
+    "DFF"
+  ],
+  "hints": [
+    "并行计算加减、AND 、 XOR 、 OR 、NOT 的结果。",
+    "Op 的四位控制结果选择器。",
+    "只有加法激活 Carry，只有减法激活 Borrow；Z 从最终选出的 Y 计算。"
+  ],
+  "rewardName": "ALU8",
+  "combinational": {
+    "expect": {
+      "Y": "Op = 0 ? (A + B) mod 256 : Op = 1 ? (A - B) mod 256 : Op = 2 ? (A & B)  : Op = 3 ? (A ^ B) : Op = 4 ? (A | B) : Op = 5 ? (~A) : 0",
+      "Carry": "Op = 0 ? (A + B > 255 ? 1 : 0) : 0",
+      "Borrow": "Op = 1 ? (A < B ? 1 : 0) : 0",
+      "Z": "(((Op = 0 ? (A + B) mod 256 : Op = 1 ? (A - B) mod 256 : Op = 2 ? (A & B)  : Op = 3 ? (A ^ B) : Op = 4 ? (A | B) : Op = 5 ? (~A) : 0) = 0) & (Op <= 5)) ? 1 : 0"
+    },
+    "cases": {
+      "generator": "useful-computer/alu6-cases"
+    }
+  },
+  "hooks": {
+      "onEnter": "useful-computer/first-into-uc"
+  }
+}

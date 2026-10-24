@@ -17310,10 +17310,10 @@
    "digest": "0a86612b9daf7a42",
    "referenceSourceChars": 224
   },
-  "901": {
+  "921": {
    "kind": "combinational",
-   "samples": 256,
-   "digest": "2c3ea6bff8d68e5d"
+   "samples": 13683,
+   "digest": "478a1501b51ea358"
   }
  },
  "meta": [
@@ -17728,11 +17728,11 @@
    "allowedCount": 12
   },
   {
-   "id": 901,
-   "title": "四位减法",
-   "chapter": 7,
-   "allowedCount": 12,
-   "rewardName": "Subtract4"
+   "id": 921,
+   "title": "新八位 ALU",
+   "chapter": 8,
+   "allowedCount": 10,
+   "rewardName": "ALU8"
   }
  ]
 }

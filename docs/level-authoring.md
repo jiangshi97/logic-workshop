@@ -23,7 +23,7 @@
 1. 新建（或复用）一个关卡包目录 `content/packs/我的包名/`，包内新建 `levels/001-my-level.json`。
 2. 填入下方任意一个完整示例的结构并改成你的内容（`id` 只要在**本包内**唯一即可，从 1 编起）。
 3. 在包的 `index.ts` 里登记包描述符（`key` = 文件夹名、`idBase` 一个固定正整数、可选的章节与扩展点，
-   抄 `content/packs/example/index.ts` 即可）。
+   抄 `content/packs/useful-computer/index.ts` 即可）。
 4. 运行 `npm run regen:levels` 重新生成两个生成文件（编译期静态导入，Vite/vitest/Playwright 通用）。
 5. 运行 `npm test`——校验错误、编号冲突、区间相交、期望值快照变化、忘记再生成都会在这里报出来；再 `npm run dev` 试玩。
 
@@ -284,9 +284,9 @@ export const pack: LevelPack = {
 - 对 `src/machines.ts` 只做 `import type`（防运行时循环依赖）；其余核心模块随意。
 - 包内自定义组件的键避开基础目录的 `architecture-*` 前缀，防止与规范教学组件同名覆盖。
 
-`content/packs/example/` 是一个始终在线的最小模板（含一个示例关卡 `levels/001-my-pack-test.json`，
-演示包内编号、idBase 平移与三个钩子的完整接线——通关彩蛋 `onFirstClear`、提示引导 `onFirstHint`、
-失败计数教练 `onEveryTest`），生成器/钩子的写法直接抄它。
+`content/packs/useful-computer/` 是当前仓库里常驻的真实关卡包（含一个六运算 ALU 关卡 `levels/001-alu-plus.json`，
+演示包内编号、idBase 平移、追加章节、用例生成器与 `onEnter` 开场钩子的完整接线），
+生成器/钩子的写法直接抄它。
 
 ## 工作流与守卫
 

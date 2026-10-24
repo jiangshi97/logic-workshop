@@ -23,7 +23,7 @@ npm.cmd run dev -- --port 5173
 
 ## 已实现
 
-- 56 个基础关：第1–20关组合逻辑、第21–32关“状态与时间”、第33–44关“计算机架构”、第45–56关“编程应用”，全部为 content/levels/ 下的声明式 JSON 数据；此后新增关卡走 content/packs/ 关卡包（example 包带一个示例扩展关）。
+- 56 个基础关：第1–20关组合逻辑、第21–32关“状态与时间”、第33–44关“计算机架构”、第45–56关“编程应用”，全部为 content/levels/ 下的声明式 JSON 数据；此后新增关卡走 content/packs/ 关卡包（useful-computer 包带一个六运算 ALU 扩展关）。
 - 鼠标拖动与点击连线、逻辑门拖放、节点移动、框选、复制、删除、撤销重做。
 - 1/2/4/8/16位信号；支持部分未知位、多输出接口、总线拆分与合并、可配置常量。
 - 独立数学参考函数和时序状态机判题；失败自动完整回放，输出和相关导线高亮；抽样关明确标示测试集。
@@ -113,7 +113,7 @@ CPU与组件依赖固定，允许移动布局、观察内部电路和编写程�
 |---|---|
 | content/levels/ | 声明式关卡（基础 56 关的 JSON 数据：文案、提示、期望表达式/场景帧/编程用例或生成器引用） |
 | packages/level-api/ | 关卡包 TypeScript 公共 API 包（事件目录、钩子上下文、工具），见其 README |
-| content/packs/ | 关卡包：新增关卡的唯一入口（包内 JSON 关卡 + 专属生成器/钩子/机器 TS），example 包为活模板 |
+| content/packs/ | 关卡包：新增关卡的唯一入口（包内 JSON 关卡 + 专属生成器/钩子/机器 TS），useful-computer 包为活模板 |
 | src/levelSpec.ts、src/levelExpr.ts、src/levelRegistry.ts | 关卡编写 API：校验、编译与表达式求值 |
 | src/levelGenerators.ts | 命名场景/用例生成器：JSON 引用、编译期展开穷举判题数据 |
 | src/WorkshopView.tsx | 元件工坊：独立于关卡自由搭建/修改自定义组件 |

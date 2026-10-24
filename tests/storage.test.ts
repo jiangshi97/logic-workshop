@@ -158,15 +158,15 @@ it('round-trips one-shot hook trigger records and filters junk events', () => {
 it('round-trips per-level pack state and drops junk or oversized entries', () => {
   const state = createWorkspace();
   expect(JSON.parse(serializeWorkspace(createWorkspace())).packState).toBeUndefined();
-  state.packState = { 901: { clearCount: 1, note: '你好' }, 45: { tries: 3 } };
+  state.packState = { 921: { clearCount: 1, note: '你好' }, 45: { tries: 3 } };
   expect(parseWorkspace(serializeWorkspace(state), { verifyProofs: false }).packState).toEqual(state.packState);
   const junk = JSON.stringify({ ...state, packState: {
     999: { x: 1 },                       // 目录外关卡：丢弃
     bad: { x: 1 },                       // 非数字键：丢弃
     45: 'not-a-record',                  // 非对象值：丢弃
-    901: { clearCount: 2 },              // 保留
+    921: { clearCount: 2 },              // 保留
   } });
-  expect(parseWorkspace(junk, { verifyProofs: false }).packState).toEqual({ 901: { clearCount: 2 } });
+  expect(parseWorkspace(junk, { verifyProofs: false }).packState).toEqual({ 921: { clearCount: 2 } });
   const huge = 'x'.repeat(262145);
   expect(parseWorkspace(JSON.stringify({ ...state, packState: { 45: { blob: huge } } }), { verifyProofs: false }).packState).toBeUndefined();
 });

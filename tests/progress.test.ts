@@ -1,5 +1,5 @@
 // 进度助手测试：连续的基础目录（1..56）上与旧的"id 当序号"语义完全等价；
-// 关卡包引入的跳号 id（随包示例关 901）按目录位置编号/解锁/前进。
+// 关卡包引入的跳号 id（useful-computer 的 921）按目录位置编号/解锁/前进。
 import { describe, expect, it } from 'vitest';
 import { levels } from '../src/levels';
 import { displayNumber, frontierLevelId, isCleared, isUnlocked, levelPosition, makeProgress, nextLevelId, unlockedCount } from '../src/progress';
@@ -25,14 +25,14 @@ describe('progress helpers on the real catalogue', () => {
   });
 
   it('numbers the shipped pack level by position, gated behind the whole base catalogue', () => {
-    expect(displayNumber(901)).toBe(57);
-    expect(levelPosition(901)).toBe(56);
-    expect(isUnlocked(901, 55)).toBe(false); // 第 56 关尚未通过
-    expect(isUnlocked(901, 56)).toBe(true);
+    expect(displayNumber(921)).toBe(57);
+    expect(levelPosition(921)).toBe(56);
+    expect(isUnlocked(921, 55)).toBe(false); // 第 56 关尚未通过
+    expect(isUnlocked(921, 56)).toBe(true);
     expect(frontierLevelId(55)).toBe(56);
-    expect(frontierLevelId(56)).toBe(901); // 全通关后前沿落到包关卡
-    expect(nextLevelId(56)).toBe(901);
-    expect(nextLevelId(901)).toBeUndefined();
+    expect(frontierLevelId(56)).toBe(921); // 全通关后前沿落到包关卡
+    expect(nextLevelId(56)).toBe(921);
+    expect(nextLevelId(921)).toBeUndefined(); // 包关卡即目录末尾
     expect(unlockedCount(56)).toBe(57);
   });
 });

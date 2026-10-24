@@ -179,10 +179,10 @@ test('all twelve applications judge actual reference programs and unlock through
   await expect(page.getByTestId('test-feedback')).toContainText('下一关已解锁');
   await expect(page.getByTestId('progress-count')).toHaveText(`56 / ${levels.length}`);
   await page.screenshot({ path: 'work/programming-complete-desktop.png' });
-  // 基础目录止于第 56 关：下一关是 example 包的四位减法（全局 id 901，显示为第 57 关）。
+  // 基础目录止于第 56 关：下一关是 useful-computer 包的新八位 ALU（全局 id 921，显示为第 57 关）。
   await page.getByRole('button', { name: '下一关', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '四位减法', exact: true })).toBeVisible();
-  await page.screenshot({ path: 'work/level-901.png' });
+  await expect(page.getByRole('heading', { name: '新八位 ALU', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'work/level-921.png' });
 });
 
 test('long programming tasks keep animation and pause responsive, including the mobile workbench', async ({ page }) => {

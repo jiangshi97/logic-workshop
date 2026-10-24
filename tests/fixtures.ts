@@ -130,10 +130,37 @@ export function referenceCircuit(levelId: number): Circuit {
       b.output(adder.sum, 'Diff'); b.output(b.gate('NOT', adder.cout), 'Borrow');
       break;
     }
-    case 901: {
-      // example 包示例关（四位减法）：A + ~B + 1 的低四位即 (A − B) mod 16。
-      const adder = b.ripple(b.split(a, 4), b.split(second, 4).map(value => b.gate('NOT', value)), b.constant(1));
-      b.output(adder.sum, 'Diff');
+    case 921: {
+      // useful-computer 包（六运算 ALU）：Op 0..5 → 加/减/AND/XOR/OR/NOT A，非法 Op 输出全零；
+      // Carry/Borrow 仅在对应运算下激活，Z 由 Op≤5（¬o3 ∧ (¬o2 ∨ ¬o1)）门控。
+      const aa = b.split(a, 8), bb = b.split(second, 8), ops = b.split(b.input('Op'), 4);
+      const zero = b.constant(0);
+      const add = b.ripple(aa, bb, b.constant(0));
+      const sub = b.ripple(aa, bb.map(bit => b.gate('NOT', bit)), b.constant(1));
+      const addY = b.split(add.sum, 8), subY = b.split(sub.sum, 8);
+      // 16 槽树形选择器：槽位 k 输出 Op=k 的结果，非法槽位接 0（mux(a,b,s) 在 s=1 时选 b）。
+      const select = (slots: Pin[]): Pin => {
+        let layer = slots;
+        for (const control of ops) {
+          const merged: Pin[] = [];
+          for (let index = 0; index < layer.length; index += 2) merged.push(b.mux(layer[index], layer[index + 1], control));
+          layer = merged;
+        }
+        return layer[0];
+      };
+      const yBits = aa.map((abit, index) => select([
+        addY[index], subY[index],
+        b.gate('AND', abit, bb[index]), b.gate('XOR', abit, bb[index]),
+        b.gate('OR', abit, bb[index]), b.gate('NOT', abit),
+        zero, zero, zero, zero, zero, zero, zero, zero, zero, zero,
+      ]));
+      b.output(b.join(yBits), 'Y');
+      const [n0, n1, n2, n3] = ops.map(bit => b.gate('NOT', bit));
+      const both = (x: Pin, y: Pin) => b.gate('AND', x, y);
+      b.output(b.gate('AND', add.cout, both(both(n0, n1), both(n2, n3))), 'Carry'); // 仅 Op=0
+      b.output(b.gate('AND', b.gate('NOT', sub.cout), both(both(ops[0], n1), both(n2, n3))), 'Borrow'); // 仅 Op=1
+      const anyBit = yBits.slice(1).reduce((acc, bit) => b.gate('OR', acc, bit), yBits[0]);
+      b.output(b.gate('AND', b.gate('NOT', anyBit), b.gate('AND', n3, b.gate('OR', n2, n1))), 'Z');
       break;
     }
     default: throw new Error(`No reference circuit for lesson ${levelId}`);

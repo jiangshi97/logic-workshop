@@ -4,7 +4,7 @@
 
 ## 1. 项目概览
 
-「逻辑工坊」是一个数字逻辑教学游戏：基础 56 关由 `content/levels/*.json` 声明式描述，此后新增关卡以关卡包（`content/packs/<包名>/`，JSON 关卡与专属 TS 同居一目录）接入——example 包当前携带一个示例扩展关（见 [关卡编写指南](level-authoring.md)）。玩家从连线开始，逐步搭出逻辑门、加减法器、寄存器、存储器，最终组成一台能真实执行指令的八位 CPU，并在其上用汇编完成算法任务（第 45–56 关 CPU 电路固定，玩家只写程序）。
+「逻辑工坊」是一个数字逻辑教学游戏：基础 56 关由 `content/levels/*.json` 声明式描述，此后新增关卡以关卡包（`content/packs/<包名>/`，JSON 关卡与专属 TS 同居一目录）接入——useful-computer 包当前携带一个六运算 ALU 扩展关（见 [关卡编写指南](level-authoring.md)）。玩家从连线开始，逐步搭出逻辑门、加减法器、寄存器、存储器，最终组成一台能真实执行指令的八位 CPU，并在其上用汇编完成算法任务（第 45–56 关 CPU 电路固定，玩家只写程序）。
 
 技术栈：
 
@@ -67,7 +67,7 @@ src/
 tests/                       # Vitest 单元测试 (*.test.ts) 与 Playwright 浏览器测试 (*.spec.ts)
 content/levels/              # 声明式关卡（基础 56 关，JSON，见 docs/level-authoring.md）
 packages/level-api/           # 关卡包 TS 公共 API 包（事件/钩子上下文/工具；宿主与关卡包共用导入名 logic-level-api）
-content/packs/               # 关卡包：新增关卡入口（包内 JSON + 专属生成器/钩子/机器 TS），example 为活模板
+content/packs/               # 关卡包：新增关卡入口（包内 JSON + 专属生成器/钩子/机器 TS），useful-computer 为活模板
 docs/                        # 各阶段设计/验收文档与示例存档
 scripts/start-server.mjs     # 本地后台开发服务
 ```
@@ -191,8 +191,8 @@ Worker 承担全部重活，主线程只做 UI：
 
 - `levels.ts` 定义 `Level` 接口（接口端口、允许门型、三层提示、期望函数、模式、可选 hooks/pack）并聚合 `specLevels()`（按 id 排序）；`chapters` = 基础 7 章 + 各关卡包追加的标题。
 - **全部 56 个基础关卡都是声明式关卡**：`content/levels/*.json` 是纯数据（文案、端口、提示、期望值表达式/真值表/手写帧/生成器引用/编程用例），由 `levelRegistry.ts` 的 `compileCatalogue()` 构建期装载、`levelSpec.ts` 运行时校验并编译成 `Level`。期望值依然独立于任何电路或仿真器；`tests/level-content.test.ts` 的快照固化第 1–20 关全部穷举期望与全关卡判题数据摘要（sha1），防止悄悄改判题标准。作者指南见 [关卡编写指南](level-authoring.md)。
-- **关卡包（content/packs/&lt;包名&gt;/）是新增关卡的唯一入口**：包内 `levels/*.json` 放关卡、`index.ts` 导出 `LevelPack` 描述符（`src/levelPack.ts`：key / idBase / chapters / 生成器 / 钩子 / 机器）。生成脚本同时产出 `levelData.generated.ts`（含逐项对齐的 `levelSources` 与 `levelPackTags`）与 `levelPacks.generated.ts`，仍走"生成文件提交入库"路线。包关卡 JSON 的 `id` 仅本包内唯一，全局 id = `idBase + id`；`compileCatalogue` 守卫全局唯一、包区间不相交且整体在基础目录之上（保住"id 序 == 目录序"，教学组件 sourceLevel 等旧比较天然继续成立）。JSON 以字符串键引用包内 TS：生成器 `"包键/名字"`（裸名留给基础 `levelGenerators.ts`，老关卡零迁移）、钩子 `"hooks": { 事件名: "包键/名字" }`（`levelSpec` 只校验形状，运行期 `resolveHook` 解析）。公共 API（事件目录、HookContext、LevelPack 描述符、rng/range 工具）独立成包 `packages/level-api`（npm workspace，别名 `logic-level-api` 经 tsconfig paths / vite alias / node_modules 链接三路解析），关卡包 TS 统一从它导入，宿主 `src/levelPack.ts` 只留运行时汇总与解析。`content/packs/example/` 是常驻的最小模板（含一个示例关卡，打通 tsc/Vite/Playwright 对 content TS 的真实编译链路）。
-- **进度与序号（progress.ts）**：解锁链沿目录**位置**推进——`displayNumber/isUnlocked/isCleared/nextLevelId/frontierLevelId` 全部按位置计算，`makeProgress` 工厂供测试注入稀疏目录。基础目录 1..56 连续（位置+1 == id），对现有存档与显示逐字节等价；关卡包的稀疏 id（如 901）显示为第 57 关。`storage.ts` 的 `currentLevel` 校验同改位置语义。
+- **关卡包（content/packs/&lt;包名&gt;/）是新增关卡的唯一入口**：包内 `levels/*.json` 放关卡、`index.ts` 导出 `LevelPack` 描述符（`src/levelPack.ts`：key / idBase / chapters / 生成器 / 钩子 / 机器）。生成脚本同时产出 `levelData.generated.ts`（含逐项对齐的 `levelSources` 与 `levelPackTags`）与 `levelPacks.generated.ts`，仍走"生成文件提交入库"路线。包关卡 JSON 的 `id` 仅本包内唯一，全局 id = `idBase + id`；`compileCatalogue` 守卫全局唯一、包区间不相交且整体在基础目录之上（保住"id 序 == 目录序"，教学组件 sourceLevel 等旧比较天然继续成立）。JSON 以字符串键引用包内 TS：生成器 `"包键/名字"`（裸名留给基础 `levelGenerators.ts`，老关卡零迁移）、钩子 `"hooks": { 事件名: "包键/名字" }`（`levelSpec` 只校验形状，运行期 `resolveHook` 解析）。公共 API（事件目录、HookContext、LevelPack 描述符、rng/range 工具）独立成包 `packages/level-api`（npm workspace，别名 `logic-level-api` 经 tsconfig paths / vite alias / node_modules 链接三路解析），关卡包 TS 统一从它导入，宿主 `src/levelPack.ts` 只留运行时汇总与解析。`content/packs/useful-computer/` 是常驻的真实关卡包（打通 tsc/Vite/Playwright 对 content TS 的真实编译链路）。
+- **进度与序号（progress.ts）**：解锁链沿目录**位置**推进——`displayNumber/isUnlocked/isCleared/nextLevelId/frontierLevelId` 全部按位置计算，`makeProgress` 工厂供测试注入稀疏目录。基础目录 1..56 连续（位置+1 == id），对现有存档与显示逐字节等价；关卡包的稀疏 id（如 useful-computer 的 921）显示为第 57 关。`storage.ts` 的 `currentLevel` 校验同改位置语义。
 - **关卡钩子（App.tsx；API 定义在 packages/level-api）**：9 个事件（7 个一次性 + onEveryEnter/onEveryTest 两个周期性）经 `fireHook` 分发，挂点在进入关卡 / 展开提示 / runTest 判题 / 整关打包 / 应用汇编；`HookContext` 提供 notify/showMessage/progress/catalog/draft 与判题报告 `test`，外加本关私有 `store`（`Workspace.packState`，v7 加法字段，键值限 JSON 且限额）。一次性记录持久化在 `Workspace.firedHooks`，周期性事件不持久化；未知钩子名或执行出错降级为 toast，不中断游戏。
 - 第 21–44 关的时序场景帧（`TestSequence`：逐步 `{inputs, tick, expectedOutputs}`，覆盖保持、复位优先级、同沿读写旧值、回绕等细节）与第 33/34/40 关的公开用例集都以 `"generator": "名字"` 引用 `levelGenerators.ts`，编译期展开并复用手写数据的同一校验——JSON 保持人可编写的小体积，穷举数据由独立参考状态机（`temporalOracle` / `architectureOracle`）产生；第 45–56 关的编程用例与参考源是 JSON 里的紧凑数据。`defineLevel()`（同一编译器的 TS 包装）供程序化组装 spec 使用，不进入目录聚合。
 - `architectureSpec.ts` 是 ISA 唯一权威：16 位指令 = Opcode[15:12] · Param[11:8] · Imm[7:0]，10 条指令；`architectureOracle` 是完整参考 CPU（三阶段状态机）；`architecturePrograms` 是第 44 关判题用的 10 个测试程序。
