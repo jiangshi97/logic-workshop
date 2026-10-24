@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>逻辑工坊 · 关卡编写完全指南</title>
+<style>
+  :root {
+    --ink: #1f2430; --muted: #5b6472; --line: #dfe3ea; --bg: #ffffff; --soft: #f6f8fa;
+    --accent: #0b5fff; --warn-bg: #fff6e5; --warn-line: #e6a23c; --ok-bg: #eefaf0; --ok-line: #4caf6d;
+    --code-bg: #f2f4f8; --code-ink: #26324d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.7; }
+  .layout { display: flex; min-height: 100vh; }
+  nav { width: 280px; flex-shrink: 0; border-right: 1px solid var(--line); padding: 28px 18px; position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--soft); }
+  nav h1 { font-size: 17px; margin: 0 0 4px; }
+  nav .sub { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  nav ol { list-style: none; padding: 0; margin: 0; counter-reset: toc; }
+  nav li { margin: 2px 0; }
+  nav a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 13.5px; }
+  nav a:hover { background: #e8ecf3; color: var(--accent); }
+  main { flex: 1; max-width: 900px; margin: 0 auto; padding: 36px 44px 120px; }
+  h2 { font-size: 24px; border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-top: 56px; }
+  h3 { font-size: 18.5px; margin-top: 34px; }
+  h4 { font-size: 15.5px; margin-top: 24px; }
+  p, li { font-size: 14.5px; }
+  code { font-family: "JetBrains Mono", Consolas, "Courier New", monospace; background: var(--code-bg); color: var(--code-ink); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; padding: 0; font-size: 12.8px; line-height: 1.65; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13.5px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  .box { border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-line); }
+  .ok { background: var(--ok-bg); border: 1px solid var(--ok-line); }
+  .box p { margin: 6px 0; }
+  .box p:first-child { margin-top: 0; } .box p:last-child { margin-bottom: 0; }
+  .tag { display: inline-block; font-size: 11.5px; padding: 0 7px; border-radius: 10px; margin-right: 4px; vertical-align: 1px; }
+  .tag.req { background: #fde8e8; color: #c0392b; }
+  .tag.opt { background: #e8f0fe; color: #1a56b0; }
+  .tag.once { background: #f3e8fd; color: #7d3ba8; }
+  .tag.loop { background: #e6f7f1; color: #1d8a5e; }
+  .toc-top { font-size: 13px; color: var(--muted); }
+  kbd { border: 1px solid #c4cbd6; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: #fff; font-size: 12px; font-family: inherit; }
+  @media (max-width: 980px) { .layout { display: block; } nav { position: static; width: auto; height: auto; } main { padding: 24px; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <h1>关卡编写完全指南</h1>
+  <div class="sub">逻辑工坊 · 面向关卡作者</div>
+  <ol>
+    <li><a href="#intro">这份文档写给谁</a></li>
+    <li><a href="#model">三分钟心智模型</a></li>
+    <li><a href="#quickstart">快速上手：新增一个关卡包</a></li>
+    <li><a href="#json">关卡 JSON 完全参考</a></li>
+    <li><a href="#combinational">判题模式一：combinational</a></li>
+    <li><a href="#expr">期望值表达式语言</a></li>
+    <li><a href="#sequential">判题模式二：sequential</a></li>
+    <li><a href="#program">判题模式三：program</a></li>
+    <li><a href="#pack">关卡包 index.ts 完全参考</a></li>
+    <li><a href="#generator">生成器：用 TypeScript 造判题数据</a></li>
+    <li><a href="#hooks">钩子：事件驱动的特殊行为</a></li>
+    <li><a href="#machine">扩展点：新计算机</a></li>
+    <li><a href="#workflow">测试与工作流</a></li>
+    <li><a href="#fixtures">e2e 参考电路（fixtures.ts）</a></li>
+    <li><a href="#errors">报错速查表（踩坑实录）</a></li>
+    <li><a href="#limits">保留下来的限制及原因</a></li>
+  </ol>
+</nav>
+<main>
+
+<h2 id="intro">1. 这份文档写给谁</h2>
+<p>假定你<strong>会玩逻辑工坊</strong>（知道关卡、门电路、判题是什么），也<strong>会 TypeScript 语法</strong>，但完全不了解这个项目的内部实现。这份文档把「新增一个关卡」需要知道的<strong>全部</strong>规则放在一处：目录结构、每个字段的含义与校验规则、表达式语法、生成器与钩子的完整 API、常见报错的处理办法。</p>
+<p>配套文档（按需查阅，本文已覆盖它们的要点）：</p>
+<ul>
+  <li><code>docs/level-authoring.md</code> —— 精简版速查（Markdown）。</li>
+  <li><code>packages/level-api/README.md</code> —— <code>logic-level-api</code> 包的 API 签名参考。</li>
+  <li><code>docs/code-guide.md</code> —— 整个项目的架构导览。</li>
+</ul>
+<p>仓库里永远有一个<strong>活模板</strong>：<code>content/packs/useful-computer/</code>（一个六运算 ALU 关卡，演示了包内编号、idBase 平移、追加章节、用例生成器与 onEnter 钩子的完整接线）。照抄它改就行。</p>
+
+<h2 id="model">2. 三分钟心智模型</h2>
+<p>关卡 = <strong>一份 JSON 数据</strong>。判题 = 拿你声明的<strong>数学期望值</strong>（表达式 / 真值表 / 预填帧 / 编程用例）对比玩家搭的电路的实际输出。期望值完全不经过任何电路或仿真器——它是一个独立的小语言求值器，所以判题标准绝对客观。</p>
+<p>装载链路（每一步都会在出错时给你带文件路径的报错）：</p>
+<pre><code>content/levels/*.json            基础 56 关（冻结，别动）
+content/packs/&lt;包名&gt;/levels/*.json   你的新关卡（JSON 数据）
+content/packs/&lt;包名&gt;/index.ts       包描述符：生成器/钩子/机器/章节的注册处
+        │
+        ▼  npm run regen:levels
+src/levelData.generated.ts       关卡数据 + 源路径 + 包标记（提交入库）
+src/levelPacks.generated.ts      包清单
+        │
+        ▼  应用启动 / npm test（compileCatalogue）
+校验 + 编译成 Level 目录：id 平移、区间守卫、生成器展开、章节上界检查
+        │
+        ▼  运行时（App.tsx）
+判题 / 解锁进度 / 钩子触发</code></pre>
+<div class="warn"><p><strong>最重要的两条习惯：</strong>① 改了任何关卡 JSON 后必须跑 <code>npm run regen:levels</code>，否则改动不会生效（生成文件提交入库是刻意的——Playwright 的转译器不支持 Vite 专有特性）；② 跑 <code>npm test</code>，它会把所有校验错误、编号冲突、快照变化报出来。</p></div>
+<p>编号体系：<strong>基础目录</strong>（1–56）按 id 排序、id 即序号；<strong>关卡包</strong>里 JSON 的 <code>id</code> 只需在本包内唯一，全局 id = <code>idBase + 包内 id</code>。侧栏显示的「第 N 关」和解锁顺序一律按<strong>目录位置</strong>算——全局 id 921 的关卡显示为第 57 关。存档、判题、解锁用全局 id，所以 <code>idBase</code> 一旦定了就别改。</p>
+
+<h2 id="quickstart">3. 快速上手：新增一个关卡包</h2>
+<p>目标：加一个新关卡，挂在第 8 章「指令集扩展」下，带一个开场钩子和一个用例生成器。总共五步：</p>
+<h3>第 1 步：建目录</h3>
+<pre><code>content/packs/我的扩展/
+  index.ts          # 包描述符（必需，唯一必需的文件）
+  levels/001-xxx.json   # 关卡数据（注意是 levels，复数）</code></pre>
+<p>包的文件夹名就是<strong>包键</strong>，全局唯一；可以用小写字母、数字、连字符，也<strong>允许下划线、大写和中文</strong>（只要求 1–64 个字符、不含空格和斜杠）。</p>
+<h3>第 2 步：写 index.ts</h3>
+<pre><code>import { range, type CaseGenerator, type HookContext, type LevelHook, type LevelPack } from 'logic-level-api';
+
+const 开场白 = ({ level, showMessage }: HookContext) =>
+  showMessage('欢迎', `「${level.title}」开始了！`);
+
+const 我的用例: CaseGenerator = ({ localId }) =&gt; {
+  if (localId !== 1) return [];        // 按包内编号分派（将来加第 2 关时用）
+  return range(8).map(A =&gt; ({ A, B: 255 - A }));
+};
+
+export const pack: LevelPack = {
+  key: '我的扩展',                     // 必须与文件夹同名
+  idBase: 1000,                        // 全局 id = 1000 + JSON id，选远离 56 的固定值，永不改动
+  chapters: ['指令集扩展'],             // 可选：追加章节（第 8 章）
+  caseGenerators: new Map([['my-cases', 我的用例]]),
+  hooks: new Map([['开场白', 开场白]]),  // Map 键 = JSON 引用的后半段；TS 函数名随意
+};</code></pre>
+<h3>第 3 步：写 levels/001-xxx.json</h3>
+<p>抄第 4 节的字段参考，或直接抄 <code>content/packs/useful-computer/levels/001-alu-plus.json</code> 改。</p>
+<h3>第 4 步：生成 + 测试</h3>
+<pre><code>npm run regen:levels    # JSON 进生成文件
+npm test                # 校验 + 快照（新关卡会让快照失败，见第 13 节）</code></pre>
+<h3>第 5 步：试玩</h3>
+<pre><code>npm run dev</code></pre>
+<p>如果要让浏览器端到端测试（Playwright）也能自动通关你的关卡，还要在 <code>tests/fixtures.ts</code> 加参考电路（第 14 节）。</p>
+
+<h2 id="json">4. 关卡 JSON 完全参考</h2>
+<table>
+  <tr><th>字段</th><th>类型</th><th>必填</th><th>规则</th></tr>
+  <tr><td><code>id</code></td><td>正整数</td><td><span class="tag req">必填</span></td><td>基础目录：全局唯一；关卡包：<strong>仅本包内唯一</strong>，从 1 编起、允许跳号。全局 id = idBase + id。</td></tr>
+  <tr><td><code>title</code> / <code>caption</code></td><td>string</td><td><span class="tag req">必填</span></td><td>非空。名称与副标题。</td></tr>
+  <tr><td><code>goal</code> / <code>formula</code></td><td>string</td><td><span class="tag req">必填</span></td><td>非空。任务正文与数学公式。</td></tr>
+  <tr><td><code>chapter</code></td><td>正整数</td><td><span class="tag req">必填</span></td><td>≥1。上界不是写死的：装载时按「基础 7 章 + 各包 <code>chapters</code> 追加的章节数」动态检查，超出会报错并告诉你总数。</td></tr>
+  <tr><td><code>inputs</code> / <code>outputs</code></td><td><code>[端口名, 位宽][]</code></td><td><span class="tag req">必填</span></td><td>端口名必须是合法标识符 <code>[A-Za-z_][A-Za-z0-9_]*</code>（这是期望值表达式语言的限制，见第 6 节），不能用保留字 <code>div</code>/<code>mod</code>；位宽 1–32；输入与输出端口名不能重名。</td></tr>
+  <tr><td><code>allowed</code></td><td>门型数组</td><td><span class="tag opt">可选</span></td><td>本关可用的门型。省略时：id ≤ 20 的关卡按解锁表推导（NAND@2、NOT@4、AND@5、OR@6、XOR@7、XNOR@8、SPLIT/JOIN@11、CONST@19），其余关卡取全部门型。</td></tr>
+  <tr><td><code>hints</code></td><td>string[3]</td><td><span class="tag req">必填</span></td><td><strong>恰好三条</strong>递进提示，一条都不能少。</td></tr>
+  <tr><td><code>rewardName</code></td><td>string</td><td><span class="tag opt">可选</span></td><td>通关后把整关电路打包成组件时的默认名。</td></tr>
+  <tr><td><code>defaultProgram</code></td><td>number[]</td><td><span class="tag opt">可选</span></td><td>ROM 初始指令字，最多 256 个 16 位字（0–65535）。</td></tr>
+  <tr><td><code>hooks</code></td><td>对象</td><td><span class="tag opt">可选</span></td><td><strong>必须写在 JSON 顶层</strong>（放进 <code>combinational</code> 里会被静默忽略！）。格式 <code>{ 事件名: "包键/钩子名" }</code>，见第 11 节。</td></tr>
+  <tr><td><code>combinational</code> / <code>sequential</code> / <code>program</code></td><td>对象</td><td><span class="tag req">三选一</span></td><td>判题模式段，<strong>必须恰好提供一个</strong>，给了两个或一个都不给都会报错。</td></tr>
+</table>
+
+<h2 id="combinational">5. 判题模式一：combinational</h2>
+<p>组合逻辑关。期望值来源三选一/二选一：</p>
+<h3>5.1 <code>expect</code> 表达式（首选）</h3>
+<pre><code>"combinational": {
+  "expect": {
+    "Diff": "(A - B) mod 16",
+    "Borrow": "A &lt; B"
+  }
+}</code></pre>
+<p>每个<strong>输出端口</strong>一条表达式，必须恰好覆盖每个输出（多写、少写都报错）。语法见第 6 节。</p>
+<h3>5.2 <code>truthTable</code> 真值表（小输入空间可读写法）</h3>
+<pre><code>"combinational": {
+  "truthTable": [
+    { "inputs": { "A": 0, "B": 0 }, "outputs": { "Y": 1 } },
+    { "inputs": { "A": 1, "B": 0 }, "outputs": { "Y": 0 } }
+  ]
+}</code></pre>
+<p><code>expect</code> 与 <code>truthTable</code> 二选一。每行 <code>inputs</code> 必须覆盖全部输入端口、<code>outputs</code> 必须覆盖全部输出端口，且值不得超出端口位宽。</p>
+<h3>5.3 <code>cases</code> 公开测试集</h3>
+<p>省略 <code>cases</code> 时判题<strong>穷举全部输入组合</strong>（<code>2^总位数</code> 种）。总位数一大就不可行——8+8+4 = 20 位就是 100 万次仿真。这时声明公开用例集：</p>
+<pre><code>// 写法一：手写数组（每项必须覆盖【全部】输入端口，值不超位宽）
+"cases": [ { "A": 0, "B": 1, "Sub": 1 } ]
+
+// 写法二：生成器引用（推荐，数据在 TS 里造）
+"cases": { "generator": "我的扩展/my-cases" }</code></pre>
+<div class="warn"><p><strong>真实踩坑：</strong>引用了基础目录的 <code>"generator": "alu-cases"</code> 但你的关卡有六种运算？基础生成器只生成 Op 0–3 的用例，你的 Op=4/5 分支<strong>永远不会被判题</strong>，一个没实现它们的电路也能通关。基础生成器是冻结的（老关卡判题标准不能变），所以运算集不同就必须<strong>在自己包里写生成器</strong>（第 10 节）。</p></div>
+
+<h2 id="expr">6. 期望值表达式语言</h2>
+<p>纯整数运算的安全小语言（<code>src/levelExpr.ts</code>），无函数调用、无属性访问、因此没有注入面。优先级与 C 一致，从低到高：</p>
+<table>
+  <tr><th>类别</th><th>运算符</th><th>说明</th></tr>
+  <tr><td>三目</td><td><code>a ? b : c</code></td><td>可链式；复杂译码逻辑靠它</td></tr>
+  <tr><td>位或</td><td><code>|</code></td><td></td></tr>
+  <tr><td>位异或</td><td><code>^</code></td><td></td></tr>
+  <tr><td>位与</td><td><code>&amp;</code></td><td></td></tr>
+  <tr><td>相等</td><td><code>=</code> <code>!=</code></td><td>注意是 <code>=</code> 不是 <code>==</code>；结果为 1 或 0</td></tr>
+  <tr><td>关系</td><td><code>&lt; &lt;= &gt; &gt;=</code></td><td>结果为 1 或 0</td></tr>
+  <tr><td>移位</td><td><code>&lt;&lt; &gt;&gt;</code></td><td></td></tr>
+  <tr><td>加减</td><td><code>+ -</code></td><td></td></tr>
+  <tr><td>乘除</td><td><code>* div mod</code></td><td><code>div</code>/<code>mod</code> 是保留字（不能作端口名）</td></tr>
+  <tr><td>一元</td><td><code>- ~</code></td><td><code>~</code> 按位取反</td></tr>
+  <tr><td>原子</td><td>数字、端口名、括号</td><td>数字支持十进制与 <code>0x</code> 十六进制</td></tr>
+</table>
+<ul>
+  <li><code>div</code> 是向下取整除法；<code>mod</code> 是<strong>与除数同号</strong>的数学取模——所以 <code>(A - B) mod 16</code> 在 A&lt;B 时直接得到补码结果，不用自己加 16。</li>
+  <li>求值结果自动按输出端口位宽取模（接 1 位输出时 <code>~(A &amp; B)</code> 自动变成 0/1）——但注意<strong>只在输出端口处取模</strong>：表达式中间值保持原始整数（可为负）。真实案例：<code>~A</code> 对 A=255 得 <code>-256</code>，输出到 8 位端口显示 0，但写进 Z 的比较式 <code>(~A) = 0</code> 用的是原始值 −256，永远不成立。</li>
+  <li>除零在求值时抛错；引用未声明的端口名在<strong>编译期</strong>报错（错误信息带位置）。</li>
+  <li>端口名必须匹配 <code>[A-Za-z_][A-Za-z0-9_]*</code>——这就是第 4 节端口命名限制的来历。</li>
+</ul>
+
+<h2 id="sequential">7. 判题模式二：sequential</h2>
+<p>时序关。期望值预填在帧里，逐场景逐步骤回放。</p>
+<h3>7.1 手写场景（步数可控时用）</h3>
+<pre><code>"sequential": {
+  "scenarios": [
+    {
+      "label": "写入与保持",
+      "steps": [
+        { "inputs": { "D": 1 }, "tick": false, "expected": { "Q": 0 } },
+        { "inputs": { "D": 1 }, "expected": { "Q": 1 } },
+        { "inputs": { "D": 0 }, "tick": false, "expected": { "Q": 1 } }
+      ]
+    }
+  ]
+}</code></pre>
+<ul>
+  <li>每步 <code>inputs</code> 可省略端口（缺省 0）；<code>tick</code> 缺省 <code>true</code>（推进一个时钟沿），<code>false</code> 表示只改输入不出沿。</li>
+  <li><code>expected</code> 必须覆盖<strong>全部输出端口</strong>，值不超位宽。</li>
+  <li>场景可带 <code>program</code>（最多 256 个 16 位指令字）为该场景预置 ROM——取指/整机关靠它逐场景换程序。</li>
+  <li>建议先用参考电路在工坊里把期望值跑出来再誊写。</li>
+</ul>
+<h3>7.2 生成器引用（海量穷举帧时用）</h3>
+<pre><code>"sequential": { "generator": "我的扩展/my-scenarios" }</code></pre>
+<p>手写与生成器二选一。生成数据与手写数据走<strong>完全相同</strong>的校验。</p>
+
+<h2 id="program">8. 判题模式三：program</h2>
+<p>编程关：在真实门级 CPU 上执行玩家写的 ROM，期望值只来自你声明的数学用例。</p>
+<pre><code>"program": {
+  "machine": "computer-44",              // 可选：绑定的计算机注册表键；缺省取第一台
+  "cases": [
+    {
+      "label": "RAM[240]=7",
+      "memory": { "240": 7 },             // 地址（"0"–"255" 字符串键）→ 初始字节
+      "expectedOutput": [21],             // 期望的完整 OUT 序列（0–255 字节）
+      "maxCycles": 400,                   // 周期预算，1–100000
+      "expectedMemory": { "100": 21 }     // 可选：期望的最终内存
+    }
+  ],
+  "referenceSource": "MOVI A, 3\nOUT 0\nHLT"   // 参考汇编源（≤32000 字符）
+}</code></pre>
+<ul>
+  <li><code>cases</code> 不能为空；每个用例必须有 <code>label</code>。</li>
+  <li><code>machine</code> 键规则：1–64 字符，不含空格与斜杠。</li>
+</ul>
+
+<h2 id="pack">9. 关卡包 index.ts 完全参考</h2>
+<p>一个包 = <code>content/packs/&lt;包名&gt;/</code> 一个目录。类型 <code>LevelPack</code> 从 <code>'logic-level-api'</code> 导入（npm workspace 包，直接按名字 import，不用相对路径）：</p>
+<pre><code>import { type LevelPack } from 'logic-level-api';
+
+export const pack: LevelPack = {
+  key: '我的扩展',          // 必须 === 文件夹名
+  idBase: 1000,             // 正整数，一次性决定，永不改动
+  chapters: ['指令集扩展'],  // 可选：追加章节标题
+  scenarioGenerators: new Map(),  // 可选：场景生成器注册表
+  caseGenerators: new Map(),      // 可选：用例生成器注册表
+  machines: [],                   // 可选：新计算机描述符
+  hooks: new Map(),               // 可选：钩子注册表
+};</code></pre>
+<table>
+  <tr><th>字段</th><th>规则</th></tr>
+  <tr><td><code>key</code></td><td>= 文件夹名。1–64 字符，<strong>不含空格与斜杠</strong>——下划线、大写、中文都可以。JSON 里的引用以它做命名空间前缀。</td></tr>
+  <tr><td><code>idBase</code></td><td>正整数。包内全部关卡的全局 id 必须 &gt; 基础目录最大关卡号（56）且与其他包的区间不相交——装载守卫会检查并报出冲突双方。相邻包留足间隔（如 1000 / 2000）。</td></tr>
+  <tr><td><code>chapters</code></td><td>追加的章节标题，编号接在基础 7 章之后，按包的装载顺序排。</td></tr>
+  <tr><td><code>scenarioGenerators</code> / <code>caseGenerators</code></td><td><code>Map&lt;名字, 函数&gt;</code>，名字只需包内唯一。见第 10 节。</td></tr>
+  <tr><td><code>machines</code></td><td><code>MachineDescriptor[]</code>，<code>sourceLevel</code> 写<strong>包内编号</strong>，装载时自动翻译成全局 id。见第 12 节。</td></tr>
+  <tr><td><code>hooks</code></td><td><code>Map&lt;名字, (ctx) =&gt; void&gt;</code>。见第 11 节。</td></tr>
+</table>
+<h3>包规则（防装载循环，违反会炸得很难看）</h3>
+<ul>
+  <li><code>index.ts</code> 顶层<strong>只组装描述符</strong>，不要在模块顶层调用游戏运行时函数——模块求值期关卡目录还没就绪。函数体里（回调里）随便调。</li>
+  <li>生成器与钩子不得 import <code>levels</code> 目录。</li>
+  <li>对 <code>src/machines.ts</code> 只做 <code>import type</code>（防运行时循环依赖）；其余核心模块随意。</li>
+  <li>包内自定义组件键避开基础目录的 <code>architecture-*</code> 前缀。</li>
+</ul>
+
+<h2 id="generator">10. 生成器：用 TypeScript 造判题数据</h2>
+<p>生成器 = 一个普通函数，在<strong>目录装载时（应用/测试每次启动）执行一次</strong>，返回值经与手写数据完全相同的校验后物化缓存，判题时反复使用。</p>
+<h3>10.1 类型与上下文</h3>
+<pre><code>import { rng, range, type CaseGenerator, type ScenarioGenerator } from 'logic-level-api';
+
+// 用例生成器：返回一组完整输入赋值（组合关 cases）
+const myCases: CaseGenerator = ({ id, pack, localId, inputPorts, outputPorts }) =&gt; [ ... ];
+
+// 场景生成器：返回帧时间线（时序关 scenarios）
+const myScenarios: ScenarioGenerator = ({ inputPorts }) =&gt; [ ... ];</code></pre>
+<p>上下文 <code>GeneratorContext</code>：</p>
+<table>
+  <tr><th>字段</th><th>含义</th></tr>
+  <tr><td><code>id</code></td><td><strong>全局</strong> id（idBase 平移后）。基础生成器（temporal 等）按它分派老关卡。</td></tr>
+  <tr><td><code>localId</code></td><td><strong>包内</strong>编号（JSON 里的 id）。包生成器应该按它分派——它不随 idBase 变化。</td></tr>
+  <tr><td><code>pack</code></td><td>所属包键（包生成器才有）。</td></tr>
+  <tr><td><code>inputPorts</code> / <code>outputPorts</code></td><td><code>{ id, label, bits }[]</code>，可直接推导缺省值或位宽。</td></tr>
+</table>
+<h3>10.2 注册与引用（命名空间规则）</h3>
+<ul>
+  <li>注册：包 <code>index.ts</code> 里 <code>caseGenerators: new Map([['my-cases', fn]])</code>。</li>
+  <li>引用：JSON 写 <code>"generator": "我的扩展/my-cases"</code>（带包键前缀）→ 查你的包。</li>
+  <li>裸名（如 <code>"alu-cases"</code>）→ 查<strong>基础目录</strong> <code>src/levelGenerators.ts</code> 的注册表（temporal / architecture / alu-cases / controller-cases）。老关卡引用零迁移。</li>
+  <li>查不到的名字在装载时报 <code>未知的生成器"xxx"</code>。</li>
+</ul>
+<h3>10.3 必须纯且确定</h3>
+<p>生成器每次启动都会重新执行，且测试快照会把判题数据的<strong>条数与 sha1 摘要</strong>钉死。不要用 <code>Math.random()</code>——用包里提供的确定性随机：</p>
+<pre><code>import { rng, range } from 'logic-level-api';
+const random = rng(42);          // mulberry32，同种子永远同一序列
+range(256)                        // → [0, 1, …, 255]</code></pre>
+<h3>10.4 用例设计范式（抄得走的经验）</h3>
+<p>总位数大时不可能穷举，标准折中是「<strong>全枚举一个操作数 × 边界采样另一个 × 控制信号全覆盖</strong>」。以六运算 ALU 为例（即 <code>useful-computer</code> 包的 <code>alu6-cases</code>）：</p>
+<pre><code>const alu6CaseList: CaseGenerator = ({ localId }) =&gt; {
+  if (localId !== 1) return [];
+  const cases = [];
+  for (const A of range(256)) {                       // 操作数一：全枚举
+    const partners = new Set([0, 1, 127, 128, 254, 255, A, 255 - A, (A * 73) &amp; 255]);
+    // ↑ 边界伙伴集：0/1 零与最小增量、127/128 补码分界、254/255 溢出、
+    //   A 自身（测零标志）、255-A 恰不进位、A·73 伪随机普通值
+    for (const B of partners) for (const op of range(6)) cases.push({ A, B, Op: op }); // 控制全覆盖
+  }
+  for (const [A, B, Op] of [[0, 0, 6], [255, 1, 15], [128, 128, 9]] as const)
+    cases.push({ A, B, Op });                         // 非法 Op 定点抽检
+  return cases;
+};</code></pre>
+
+<h2 id="hooks">11. 钩子：事件驱动的特殊行为</h2>
+<p>钩子是普通 TypeScript 函数，在游戏事件发生时被调用，只能通过上下文 API 产生可见效果。声明在关卡 JSON <strong>顶层</strong>：</p>
+<pre><code>"hooks": { "onEnter": "我的扩展/开场白" }</code></pre>
+<p>引用命名规则（<strong>已放宽</strong>）：两段各 1–64 个字符、不含空格与斜杠——下划线、大写、中文都可以。TS 侧 Map 键与 JSON 引用的<strong>后半段</strong>一致即可，函数名随意。</p>
+<h3>11.1 九个事件</h3>
+<table>
+  <tr><th>事件</th><th>次数</th><th>触发时机</th><th>带 <code>test</code></th></tr>
+  <tr><td><code>onEnter</code></td><td><span class="tag once">一次性</span></td><td>首次进入该关</td><td>—</td></tr>
+  <tr><td><code>onEveryEnter</code></td><td><span class="tag loop">每次</span></td><td>每次进入该关</td><td>—</td></tr>
+  <tr><td><code>onFirstHint</code></td><td><span class="tag once">一次性</span></td><td>玩家展开第一条提示</td><td>—</td></tr>
+  <tr><td><code>onAllHints</code></td><td><span class="tag once">一次性</span></td><td>三条提示全部展开</td><td>—</td></tr>
+  <tr><td><code>onFirstFail</code></td><td><span class="tag once">一次性</span></td><td>该关第一次判题失败</td><td>✓</td></tr>
+  <tr><td><code>onFirstClear</code></td><td><span class="tag once">一次性</span></td><td>该关第一次通过判题（「第一次通关后执行特殊行为」就是它）</td><td>✓</td></tr>
+  <tr><td><code>onEveryTest</code></td><td><span class="tag loop">每次</span></td><td>每次判题（通过/失败都算）</td><td>✓</td></tr>
+  <tr><td><code>onFirstPackage</code></td><td><span class="tag once">一次性</span></td><td>首次把整关电路打包成组件</td><td>—</td></tr>
+  <tr><td><code>onFirstProgramApply</code></td><td><span class="tag once">一次性</span></td><td>编程关首次应用汇编程序</td><td>—</td></tr>
+</table>
+<p>一次性事件的触发记录随存档持久化（<code>firedHooks</code>），导入/刷新<strong>不会重放</strong>；周期性事件不持久化。钩子未注册或执行抛错都只弹 toast，不会弄崩游戏。</p>
+<h3>11.2 HookContext 完整 API</h3>
+<pre><code>const 我的钩子 = ({ level, event, notify, showMessage, progress, catalog, store, draft, test }: HookContext) =&gt; { … };</code></pre>
+<table>
+  <tr><th>成员</th><th>类型 / 签名</th><th>说明</th></tr>
+  <tr><td><code>level</code></td><td><code>Level</code></td><td>触发事件的关卡（编译后的完整数据）。</td></tr>
+  <tr><td><code>event</code></td><td>事件名字符串</td><td>同一个函数注册到多个事件时用来分派。</td></tr>
+  <tr><td><code>notify(text)</code></td><td><code>(string) =&gt; void</code></td><td>右下角 toast（4.5 秒自动消失）。</td></tr>
+  <tr><td><code>showMessage(title, body)</code></td><td><code>(string, string) =&gt; void</code></td><td>模态消息框，玩家点「知道了」关闭。</td></tr>
+  <tr><td><code>progress</code></td><td>只读进度查询</td><td><code>done()</code> 已通关数；<code>total()</code> 目录总数；<code>isCleared(id?)</code> / <code>isUnlocked(id?)</code> / <code>displayNumber(id?)</code>（侧栏「第 N 关」的 N）/ <code>nextLevelId(id?)</code>（末关返回 undefined）。不带参数时作用于触发钩子的这一关。</td></tr>
+  <tr><td><code>catalog</code></td><td>只读目录视图</td><td><code>get(全局id)</code>、<code>all()</code>、<code>chapters()</code>。</td></tr>
+  <tr><td><code>store</code></td><td>本关私有键值存储</td><td>见下。</td></tr>
+  <tr><td><code>draft</code></td><td><code>{ nodes, wires }</code></td><td>触发时刻本关草稿电路的节点/连线计数（只读统计）。</td></tr>
+  <tr><td><code>test</code></td><td><code>{ passed, failure?: { inputs, mismatches } }</code></td><td>仅判题类事件携带：失败时的触发输入与不匹配的输出端口名。</td></tr>
+</table>
+<h3>11.3 store：本关私有持久化</h3>
+<pre><code>store.set('clearCount', 1);            // 写（键：1–64 字符不含空格；值必须可 JSON 序列化）
+store.get&lt;number&gt;('clearCount');       // 读（不存在返回 undefined）
+store.delete('clearCount');
+store.keys();</code></pre>
+<ul>
+  <li>随存档（v7 的 <code>packState</code> 字段）持久化，导入/刷新后仍在；按关卡隔离，别的关卡读不到。</li>
+  <li>限额（防存档爆炸，是刻意保留的硬限制）：单个值 ≤ 64 KiB；每关合计 ≤ 256 KiB。超了在 <code>set</code> 时抛错。</li>
+  <li><strong>写后读语义</strong>：同一次调用里先 <code>set</code> 再 <code>get</code> 读到的是<strong>旧值</strong>（写入走 React 状态提交）。</li>
+</ul>
+<h3>11.4 完整示例（有状态教练）</h3>
+<pre><code>import type { HookContext, LevelHook } from 'logic-level-api';
+
+const coach: LevelHook = ({ notify, store, test }: HookContext) =&gt; {
+  if (test?.passed) return;
+  const fails = (store.get&lt;number&gt;('failCount') ?? 0) + 1;
+  store.set('failCount', fails);
+  if (fails &gt;= 2) notify(`已连续未通过 ${fails} 次，试试从最高位进位开始检查。`);
+};</code></pre>
+
+<h2 id="machine">12. 扩展点：新计算机</h2>
+<p>编程关可以在多台计算机之间切换（通关来源关后解锁）。包里注册新机器：</p>
+<pre><code>import type { MachineDescriptor } from '../../../src/machines'; // 只允许 type import
+
+export const pack: LevelPack = {
+  …,
+  machines: [{
+    key: 'my-computer', name: '我的计算机', sourceLevel: 2,   // 包内编号！装载时翻译成全局 id
+    instructions: ['NOP', 'HLT', …],
+    circuit: levelId =&gt; { … },   // 回调内构建整机电路（Builder DSL + dependencyClosure）
+    library: () =&gt; ({ … }),      // 回调内构建依赖组件闭包
+  }],
+};</code></pre>
+<p>机器键冲突在启动期报错；玩家通关来源关后，机器自动出现在编程关的机器选择器里。</p>
+
+<h2 id="workflow">13. 测试与工作流</h2>
+<table>
+  <tr><th>命令</th><th>作用</th></tr>
+  <tr><td><code>npm run regen:levels</code></td><td>重扫 <code>content/</code> 生成两个 generated 文件。<strong>改任何 JSON 后必跑</strong>。</td></tr>
+  <tr><td><code>npm test</code></td><td>Vitest 全量：JSON 校验、编号守卫、内容快照、生成文件与磁盘同步检查、进度/存档/钩子等单元测试。</td></tr>
+  <tr><td><code>UPDATE_SNAPSHOTS=1 npx vitest run tests/level-content.test.ts</code></td><td>判题数据变化后的快照重生成（见下）。</td></tr>
+  <tr><td><code>npm run dev</code></td><td>本地试玩。</td></tr>
+  <tr><td><code>npm run test:e2e</code></td><td>Playwright 浏览器全量（约 6 分钟）。</td></tr>
+  <tr><td><code>npm run build</code></td><td>类型检查 + 生产构建。</td></tr>
+</table>
+<h3>13.1 内容快照在盯什么</h3>
+<p><code>tests/level-content.test.ts</code> 固化了：第 1–20 关<strong>全部穷举期望值</strong>；所有关卡判题数据的<strong>摘要</strong>（输入集/场景帧/编程用例的条数与 sha1）。你新增关卡、修改期望值或改生成器，快照都会失败——这是刻意的防呆：确认变化是设计意图后重生成：</p>
+<pre><code>UPDATE_SNAPSHOTS=1 npx vitest run tests/level-content.test.ts
+npm test   # 确认其余全绿</code></pre>
+<h3>13.2 改动一个关卡/包的完整闭环</h3>
+<pre><code>改 JSON / index.ts → npm run regen:levels → npm test
+  ├─ 快照失败 &amp; 变化符合预期 → UPDATE_SNAPSHOTS=1 … → npm test
+  └─ 全绿 → npm run dev 试玩 →（若动了电路相关行为）npm run test:e2e</code></pre>
+
+<h2 id="fixtures">14. e2e 参考电路（fixtures.ts）</h2>
+<div class="warn"><p><strong>真实踩坑：</strong>Playwright 的验收测试会<strong>遍历目录里的每一关</strong>自动通关。新关卡没有参考电路时直接报 <code>No reference circuit for lesson 921</code>。加完关卡必须去 <code>tests/fixtures.ts</code> 的 <code>referenceCircuit()</code> switch 里加一个 <code>case</code>。</p></div>
+<p>参考电路用文件内私有的 <code>Builder</code> DSL 搭（全部是 1 位门，总线靠 SPLIT/JOIN）：</p>
+<table>
+  <tr><th>API</th><th>说明</th></tr>
+  <tr><td><code>b.input('A')</code></td><td>取输入端口引脚。</td></tr>
+  <tr><td><code>b.gate('AND', a, b)</code></td><td>1 位门（<code>b</code> 可省略，如 NOT）。</td></tr>
+  <tr><td><code>b.constant(0, 8)</code></td><td>常量（默认 1 位）。</td></tr>
+  <tr><td><code>b.split(pin, 4)</code></td><td>拆位 → 引脚数组，<strong>下标 0 是最低位</strong>。</td></tr>
+  <tr><td><code>b.join(pins)</code></td><td>合并为总线。</td></tr>
+  <tr><td><code>b.mux(a, b, s)</code></td><td>s=1 选 b。内部是 NOT+AND+OR 的 1 位组合——总线选择要 <code>split</code> 后逐位 mux 再 <code>join</code>（<code>case 921</code> 的树形选择就是范例）。</td></tr>
+  <tr><td><code>b.fullAdder(a,b,cin)</code> / <code>b.ripple(a[], b[], cin)</code></td><td>加法器；ripple 返回 <code>{ sum: 总线引脚, cout }</code>。</td></tr>
+  <tr><td><code>b.output(pin, 'Y')</code></td><td>接输出端口。</td></tr>
+</table>
+<p>分派规则：编程关 → 编程参考；chapter 6 → 架构参考；chapter 5 且 id &gt; 20 → 时序参考；其余（包括你的新包关卡）走 switch 按全局 id 加 <code>case</code>。多路选择用「16 槽树形 mux、非法槽位接常量 0」的范式（抄 <code>case 921</code>）。</p>
+
+<h2 id="errors">15. 报错速查表（踩坑实录）</h2>
+<table>
+  <tr><th>报错 / 现象</th><th>原因</th><th>处理</th></tr>
+  <tr><td><code>hooks.onEnter 必须是形如"包键/钩子名"的引用（两段各 1–64 个字符，不能含空白与斜杠）</code></td><td>引用里含空格、斜杠，或没有 <code>/</code>（裸名）。<br><em>历史教训：旧版本还禁下划线和大写，<code>first_into_uc</code>/<code>firstIntoUc</code> 都被拒——现已放宽，只有空格和斜杠不行。</em></td><td>改成如 <code>useful-computer/first-into-uc</code>；确认 TS 侧 Map 键与后半段完全一致。</td></tr>
+  <tr><td>hooks 写了却<strong>从不触发，也不报错</strong></td><td><code>hooks</code> 嵌在了 <code>combinational</code>/<code>program</code> 内部——校验只认<strong>顶层</strong>字段，嵌套会被静默忽略。</td><td>把 <code>hooks</code> 挪到 JSON 顶层（与 <code>combinational</code> 平级）。</td></tr>
+  <tr><td><code>未知的生成器"xxx"</code></td><td>名字没注册，或命名空间前缀写错（裸名查基础注册表，<code>包键/名字</code> 查你的包）。</td><td>核对 index.ts 的 Map 键与 JSON 引用逐字符一致。</td></tr>
+  <tr><td>新关卡的某运算分支永远不被判题</td><td>复用了基础生成器但语义不同（如 <code>alu-cases</code> 只生成 Op 0–3）。</td><td>包内写自己的生成器（第 10.4 节范式）。</td></tr>
+  <tr><td><code>No reference circuit for lesson N</code></td><td>Playwright 验收循环缺少该关的通关电路。</td><td><code>tests/fixtures.ts</code> 加 <code>case N</code>（第 14 节）。</td></tr>
+  <tr><td><code>关卡 N 的章节号 X 超出章节总数 Y（基础 7 + 各关卡包追加）</code></td><td>用了未声明的章节号（动态上限）。</td><td>在包 <code>index.ts</code> 的 <code>chapters</code> 里声明，或改用已有章节号。</td></tr>
+  <tr><td>快照测试 <code>matches the committed snapshot exactly</code> 失败</td><td>判题数据变了（新关卡 / 改期望 / 改生成器）。</td><td>确认是设计意图 → <code>UPDATE_SNAPSHOTS=1 npx vitest run tests/level-content.test.ts</code>。</td></tr>
+  <tr><td>生成文件同步检查失败 / 改动不生效</td><td>改了 JSON 没跑 regen。</td><td><code>npm run regen:levels</code>。</td></tr>
+  <tr><td><code>cases 第 N 项缺少输入端口"X" / 超出位宽</code></td><td>手写用例没覆盖全部输入端口或值超范围。</td><td>每项写全所有输入端口，值在位宽内。</td></tr>
+  <tr><td><code>关卡包 A 与 B 的 id 区间相交 / 必须大于基础目录最大关卡号 56</code></td><td>idBase 撞了或太低。</td><td>调 idBase（如 1000/2000 错开），<strong>已发布的 idBase 不能改</strong>。</td></tr>
+  <tr><td><code>关卡包 X 声明的 key 是"…"，必须与文件夹同名</code></td><td>key ≠ 文件夹名。</td><td>改成一致。</td></tr>
+  <tr><td><code>store 键必须是不含空白的 1–64 字符 / 单个 store 值…64 KiB / 本关 packState 总量…256 KiB</code></td><td>store 写入越界。</td><td>键去空格；大对象拆键或精简（限额是刻意的）。</td></tr>
+  <tr><td>表达式报 <code>含有无法识别的字符 / 引用了未声明的端口 / 期待"…"</code></td><td>表达式语法问题（错误带位置）。</td><td>对照第 6 节文法；相等是 <code>=</code> 不是 <code>==</code>。</td></tr>
+  <tr><td><code>端口名"…"是表达式保留字 / 不合法</code></td><td>端口名用了 <code>div</code>/<code>mod</code> 或非 ASCII 标识符字符。</td><td>端口名用 <code>[A-Za-z_][A-Za-z0-9_]*</code>。</td></tr>
+</table>
+
+<h2 id="limits">16. 保留下来的限制及原因</h2>
+<p>这些限制是刻意设计的，放开会破坏教学语义或存档安全：</p>
+<table>
+  <tr><th>限制</th><th>为什么保留</th></tr>
+  <tr><td>包关卡全局 id 必须 &gt; 基础最大关卡号、各包区间不相交、idBase 发布后不可改</td><td>保住「id 序 == 目录序」不变式：教学组件解锁、进度、存档里的十几处 id 比较都依赖它。</td></tr>
+  <tr><td>端口名必须是 ASCII 标识符、不能用 <code>div</code>/<code>mod</code></td><td>端口名直接进入期望值表达式语言（第 6 节），语言词法就这么大。</td></tr>
+  <tr><td><code>hints</code> 恰好三条</td><td>三层递进提示是玩法设计（也绑定 onFirstHint/onAllHints 事件语义）。</td></tr>
+  <tr><td>位宽 1–32、<code>maxCycles</code> 1–100000、ROM ≤ 256 字、<code>referenceSource</code> ≤ 32000 字符</td><td>仿真与存档的工程上限。</td></tr>
+  <tr><td>store 值 ≤ 64 KiB / 每关 ≤ 256 KiB、值必须可 JSON 序列化</td><td>存档进 localStorage，防膨胀损坏。</td></tr>
+  <tr><td>基础 56 关判题数据冻结（快照钉死）</td><td>已发布关卡的通关标准不能悄悄变化。</td></tr>
+</table>
+<div class="ok"><p><strong>已放宽的命名限制（2026-10）：</strong>钩子引用、包键、机器键、store 键现在只要求「不含空白（钩子引用另不含斜杠）、长度 1–64」——下划线、大写字母、中文都可以用。章节号上限改为随包声明动态计算。如果你又被某条规则拦住，先来这张表和第 15 节找原因。</p></div>
+
+<p class="toc-top">— 完 — · 有新坑请补进第 15 节 · <a href="#intro">回到顶部</a></p>
+</main>
+</div>
+</body>
+</html>

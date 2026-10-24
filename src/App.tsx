@@ -185,7 +185,7 @@ function Workshop() {
       store: {
         get: <T,>(key: string): T | undefined => workspaceRef.current.packState?.[target.id]?.[key] as T | undefined,
         set: (key, value) => {
-          if (!/^[A-Za-z0-9_-]{1,64}$/.test(key)) throw new Error('store 键只允许 1–64 位字母/数字/下划线/连字符。');
+          if (!/^[^\s]{1,64}$/.test(key)) throw new Error('store 键必须是不含空白的 1–64 字符。');
           if (value === undefined) throw new Error('store 值不能是 undefined。');
           const encoded = JSON.stringify(value);
           if (encoded === undefined || encoded.length > 65536) throw new Error('单个 store 值必须可 JSON 序列化且不超过 64 KiB。');

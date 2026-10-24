@@ -70,7 +70,7 @@ export interface LevelSpec {
   caption: string;
   goal: string;
   formula: string;
-  /** 章节 1–7（新增章节需同步扩展 levels.ts 的 chapters 数组）。 */
+  /** 章节号（≥1）；上界在目录装载时按“基础 7 章 + 各关卡包追加”动态检查。 */
   chapter: number;
   inputs: [string, number][];
   outputs: [string, number][];
@@ -243,8 +243,8 @@ function validateProgram(id: number, section: unknown): ProgramSpec {
   });
   if (spec.referenceSource !== undefined && (typeof spec.referenceSource !== 'string' || spec.referenceSource.length > 32000))
     fail(id, 'referenceSource 必须是不超过 32000 字符的字符串。');
-  if (spec.machine !== undefined && (typeof spec.machine !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(spec.machine)))
-    fail(id, 'program.machine 必须是形如 computer-44 的注册表键。');
+  if (spec.machine !== undefined && (typeof spec.machine !== 'string' || !/^[^\s/]{1,64}$/.test(spec.machine)))
+    fail(id, 'program.machine 必须是不含空白与斜杠、1–64 字符的注册表键。');
   return spec;
 }
 
@@ -255,7 +255,7 @@ function validateLevelSpec(input: unknown): LevelSpec {
   for (const key of ['title', 'caption', 'goal', 'formula'] as const)
     if (typeof input[key] !== 'string' || !(input[key] as string)) fail(id, `${key} 不能为空。`);
   const chapter = whole(input.chapter);
-  if (chapter === undefined || chapter < 1 || chapter > 12) fail(id, 'chapter 必须是 1–12 的章节号。');
+  if (chapter === undefined || chapter < 1) fail(id, 'chapter 必须是正整数章节号（上界在目录装载时按合并章节数检查）。');
   if (!Array.isArray(input.hints) || input.hints.length !== 3 || input.hints.some(h => typeof h !== 'string' || !h))
     fail(id, 'hints 必须是恰好 3 条非空提示。');
   if (input.rewardName !== undefined && (typeof input.rewardName !== 'string' || !input.rewardName))
@@ -277,8 +277,8 @@ function validateLevelSpec(input: unknown): LevelSpec {
     for (const [event, ref] of Object.entries(input.hooks)) {
       if (!(LEVEL_HOOK_KEYS as readonly string[]).includes(event))
         fail(id, `hooks 的键必须是 ${LEVEL_HOOK_KEYS.join(' / ')} 之一。`);
-      if (typeof ref !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}\/[a-z0-9][a-z0-9-]{0,63}$/.test(ref))
-        fail(id, `hooks.${event} 必须是形如“包键/钩子名”的引用。`);
+      if (typeof ref !== 'string' || !/^[^\s/]{1,64}\/[^\s/]{1,64}$/.test(ref))
+        fail(id, `hooks.${event} 必须是形如“包键/钩子名”的引用（两段各 1–64 个字符，不能含空白与斜杠）。`);
     }
   }
   const sections = (['combinational', 'sequential', 'program'] as const).filter(key => input[key] !== undefined);

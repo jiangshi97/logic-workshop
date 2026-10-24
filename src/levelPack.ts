@@ -10,12 +10,13 @@ import type { CaseGenerator, LevelPack, LevelHook, ScenarioGenerator } from 'log
 
 export * from 'logic-level-api';
 
-const PACK_KEY = /^[a-z0-9][a-z0-9-]{0,63}$/;
+// 包键只要求不含空白与斜杠（1–64 字符）：下划线、大写与中文都可用；斜杠会破坏“包键/名字”引用的解析。
+const PACK_KEY = /^[^\s/]{1,64}$/;
 // 启动期校验生成清单：声明的 key 必须与文件夹一致，形状必须合法（守卫生成脚本与手写漂移）。
 export const levelPacks: readonly LevelPack[] = generatedLevelPacks.map(({ folder, pack }) => {
   if (!pack || typeof pack !== 'object') throw new Error(`关卡包 ${folder} 缺少 pack 描述符。`);
   if (pack.key !== folder) throw new Error(`关卡包 ${folder} 声明的 key 是“${String(pack.key)}”，必须与文件夹同名。`);
-  if (!PACK_KEY.test(pack.key)) throw new Error(`关卡包键“${pack.key}”不合法（仅小写字母、数字与连字符）。`);
+  if (!PACK_KEY.test(pack.key)) throw new Error(`关卡包键“${pack.key}”不合法（1–64 个字符，不能含空白与斜杠）。`);
   if (!Number.isInteger(pack.idBase) || pack.idBase < 1) throw new Error(`关卡包 ${pack.key} 的 idBase 必须是正整数。`);
   return pack;
 });

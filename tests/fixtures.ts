@@ -133,34 +133,46 @@ export function referenceCircuit(levelId: number): Circuit {
     case 921: {
       // useful-computer 包（六运算 ALU）：Op 0..5 → 加/减/AND/XOR/OR/NOT A，非法 Op 输出全零；
       // Carry/Borrow 仅在对应运算下激活，Z 由 Op≤5（¬o3 ∧ (¬o2 ∨ ¬o1)）门控。
-      const aa = b.split(a, 8), bb = b.split(second, 8), ops = b.split(b.input('Op'), 4);
-      const zero = b.constant(0);
-      const add = b.ripple(aa, bb, b.constant(0));
-      const sub = b.ripple(aa, bb.map(bit => b.gate('NOT', bit)), b.constant(1));
-      const addY = b.split(add.sum, 8), subY = b.split(sub.sum, 8);
-      // 16 槽树形选择器：槽位 k 输出 Op=k 的结果，非法槽位接 0（mux(a,b,s) 在 s=1 时选 b）。
-      const select = (slots: Pin[]): Pin => {
-        let layer = slots;
-        for (const control of ops) {
-          const merged: Pin[] = [];
-          for (let index = 0; index < layer.length; index += 2) merged.push(b.mux(layer[index], layer[index + 1], control));
-          layer = merged;
-        }
-        return layer[0];
+      // 规模约束：单张电路 ≤200 节点/≤400 线（model.ts），因此用 8 位总线门 + one-hot 选择，
+      // 而不是逐位 16 路 mux 树（那要 ~490 节点，存档导入会被拒）。
+      const bus = (type: GateType, a: Pin, c?: Pin): Pin => {
+        const id = b.node(type, 8);
+        b.wire(a, id, 'a');
+        if (c) b.wire(c, id, 'b');
+        return b.input(id);
       };
-      const yBits = aa.map((abit, index) => select([
-        addY[index], subY[index],
-        b.gate('AND', abit, bb[index]), b.gate('XOR', abit, bb[index]),
-        b.gate('OR', abit, bb[index]), b.gate('NOT', abit),
-        zero, zero, zero, zero, zero, zero, zero, zero, zero, zero,
-      ]));
-      b.output(b.join(yBits), 'Y');
+      const mask = (bit: Pin): Pin => b.join(Array.from({ length: 8 }, () => bit));
+      const aa = b.split(a, 8), ops = b.split(b.input('Op'), 4);
+      const [o0, o1, o2, o3] = ops;
       const [n0, n1, n2, n3] = ops.map(bit => b.gate('NOT', bit));
-      const both = (x: Pin, y: Pin) => b.gate('AND', x, y);
-      b.output(b.gate('AND', add.cout, both(both(n0, n1), both(n2, n3))), 'Carry'); // 仅 Op=0
-      b.output(b.gate('AND', b.gate('NOT', sub.cout), both(both(ops[0], n1), both(n2, n3))), 'Borrow'); // 仅 Op=1
-      const anyBit = yBits.slice(1).reduce((acc, bit) => b.gate('OR', acc, bit), yBits[0]);
-      b.output(b.gate('AND', b.gate('NOT', anyBit), b.gate('AND', n3, b.gate('OR', n2, n1))), 'Z');
+      const zero = b.constant(0), one = b.constant(1);
+      const add = b.ripple(aa, b.split(second, 8), zero);
+      const sub = b.ripple(aa, b.split(bus('NOT', second), 8), one);
+      const candidates = [
+        add.sum, sub.sum,
+        bus('AND', a, second), bus('XOR', a, second), bus('OR', a, second), bus('NOT', a),
+      ];
+      const low = b.gate('AND', n2, n3); // Op ≤ 3（o2=o3=0）
+      const mid = b.gate('AND', o2, n3); // Op = 4/5（o2=1,o3=0，o1=0 区分两者）
+      const oneHot = [
+        b.gate('AND', b.gate('AND', low, n0), n1), // Op=0
+        b.gate('AND', b.gate('AND', low, o0), n1), // Op=1
+        b.gate('AND', b.gate('AND', low, n0), o1), // Op=2
+        b.gate('AND', b.gate('AND', low, o0), o1), // Op=3
+        b.gate('AND', b.gate('AND', mid, n0), n1), // Op=4
+        b.gate('AND', b.gate('AND', mid, o0), n1), // Op=5
+      ];
+      // 非法 Op（≥6）时全部 one-hot 为 0 → Y=0、Carry/Borrow=0，天然归零，无需显式分支。
+      const y = oneHot.reduce((acc, sel, index) =>
+        bus('OR', acc, bus('AND', candidates[index], mask(sel))), b.constant(0, 8));
+      b.output(y, 'Y');
+      b.output(b.gate('AND', add.cout, oneHot[0]), 'Carry');
+      b.output(b.gate('AND', b.gate('NOT', sub.cout), oneHot[1]), 'Borrow');
+      const anyBit = b.split(y, 8).reduce((acc, bit) => b.gate('OR', acc, bit));
+      // 注意：Z 的判据是比较【表达式原始值】——Op=5 的 ~A 是整数按位非（可为负），不会等于 0，
+      // 因此该运算下 Z 恒为 0，与字节化后的 Y 无关（见关卡 expect 公式）。
+      const zValid = oneHot.slice(0, 5).reduce((acc, sel) => b.gate('OR', acc, sel));
+      b.output(b.gate('AND', b.gate('NOT', anyBit), zValid), 'Z');
       break;
     }
     default: throw new Error(`No reference circuit for lesson ${levelId}`);

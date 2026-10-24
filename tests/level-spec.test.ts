@@ -94,6 +94,17 @@ describe('level spec compilation', () => {
     expect(compileLevelSpec(spec101).hooks).toBeUndefined();
   });
 
+  it('accepts flexible hook reference names — underscores, capitals and non-ASCII are fine', () => {
+    expect(compileLevelSpec({ ...spec101, hooks: { onEnter: 'my_pack/First_Hook' } }).hooks)
+      .toEqual({ onEnter: 'my_pack/First_Hook' });
+    expect(compileLevelSpec({ ...spec101, hooks: { onEnter: '我的扩展/开场白' } }).hooks)
+      .toEqual({ onEnter: '我的扩展/开场白' });
+  });
+
+  it('defers chapter upper bounds to catalogue compilation (pack chapters may extend the list)', () => {
+    expect(compileLevelSpec({ ...spec101, chapter: 13 }).chapter).toBe(13);
+  });
+
   it('accepts every documented hook event, one-shot and recurring alike', () => {
     const hooks = {
       onEnter: 'p/a', onFirstHint: 'p/b', onAllHints: 'p/c', onFirstFail: 'p/d', onFirstClear: 'p/e',
@@ -117,7 +128,7 @@ describe('level spec rejection', () => {
     rejects(null, /JSON 对象/);
     rejects({ ...spec101, id: 0 }, /id/);
     rejects({ ...spec101, title: '' }, /title/);
-    rejects({ ...spec101, chapter: 13 }, /chapter/);
+    rejects({ ...spec101, chapter: 0 }, /chapter/);
     rejects({ ...spec101, hints: ['一', '二'] }, /hints/);
     rejects({ ...spec101, inputs: [] }, /不能为空/);
     rejects({ ...spec101, inputs: [['A', 1], ['A', 1]] }, /重复/);
@@ -128,6 +139,8 @@ describe('level spec rejection', () => {
     rejects({ ...spec101, defaultProgram: [0x10000] }, /defaultProgram/);
     rejects({ ...spec101, hooks: { onWin: 'example/x' } }, /hooks 的键/);
     rejects({ ...spec101, hooks: { onEnter: 'celebrate' } }, /包键\/钩子名/);
+    rejects({ ...spec101, hooks: { onEnter: 'has space/x' } }, /包键\/钩子名/);
+    rejects({ ...spec101, hooks: { onEnter: 'a/b/c' } }, /包键\/钩子名/);
     rejects({ ...spec101, hooks: 'nope' }, /hooks 必须是对象/);
   });
 

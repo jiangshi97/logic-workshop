@@ -1,5 +1,5 @@
 // 关卡包机制测试：compileCatalogue 的 id 平移与守卫（内存假包）、生成器/钩子的命名空间解析
-// （含 example 包的真实注册表与随包关卡）、包机器合并的 sourceLevel 翻译，以及基础目录冻结不变。
+// （含 useful-computer 包的真实注册表与随包关卡）、包机器合并的 sourceLevel 翻译，以及基础目录冻结不变。
 import { describe, expect, it } from 'vitest';
 import { isOnceLevelEvent, LEVEL_EVENTS, LEVEL_HOOK_KEYS, RECURRING_LEVEL_EVENTS } from 'logic-level-api';
 import { compileCatalogue } from '../src/levelRegistry';
@@ -64,7 +64,7 @@ describe('compileCatalogue', () => {
   });
 });
 
-describe('the shipped example pack and extension resolvers', () => {
+describe('the shipped packs and extension resolvers', () => {
   it('ships pack levels above the frozen base catalogue', () => {
     expect(generatedLevelPacks.map(entry => entry.folder)).toEqual(['useful-computer']);
     expect(levelPacks.map(pack => pack.key)).toEqual(['useful-computer']);

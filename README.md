@@ -116,6 +116,7 @@ CPU与组件依赖固定，允许移动布局、观察内部电路和编写程�
 | content/packs/ | 关卡包：新增关卡的唯一入口（包内 JSON 关卡 + 专属生成器/钩子/机器 TS），useful-computer 包为活模板 |
 | src/levelSpec.ts、src/levelExpr.ts、src/levelRegistry.ts | 关卡编写 API：校验、编译与表达式求值 |
 | src/levelGenerators.ts | 命名场景/用例生成器：JSON 引用、编译期展开穷举判题数据 |
+| docs/level-authoring.html | 关卡编写完全指南（HTML，面向新手的完整教程与踩坑速查） |
 | src/WorkshopView.tsx | 元件工坊：独立于关卡自由搭建/修改自定义组件 |
 | src/libraryGrouping.ts | 组件库展示分组：相似元件按家族合并、位宽变体小选择框切换 |
 | src/levels.ts | 关卡目录聚合（启动期关卡号守卫） |
